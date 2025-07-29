@@ -79,6 +79,10 @@ if(PYTHON)
     "${PROJECT_SOURCE_DIR}/setup.py.in"
     "${PROJECT_BINARY_DIR}/setup.py"
   )
+  configure_file(
+    "${PROJECT_SOURCE_DIR}/pyproject.toml.in"
+    "${PROJECT_BINARY_DIR}/pyproject.toml"
+  )
   add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/PyFastBDT" "${PROJECT_BINARY_DIR}/PyFastBDT"
