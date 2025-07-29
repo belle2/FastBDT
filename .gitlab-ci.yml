@@ -31,7 +31,7 @@ build:
     paths:
       - install/
       - venv/
-    expire_in: 0
+    expire_in: 1s
 
 test:
   stage: test
