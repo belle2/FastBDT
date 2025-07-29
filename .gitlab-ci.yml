@@ -3,7 +3,30 @@ stages:
   - test
 
 variables:
-  DEBIAN_FRONTEND: 'noninteractive'
+  DEBIAN_FRONTEND: "noninteractive"
+  PYTHON_VERSION: "3.11"
+  UPGRADE_PIP: "false"
+
+.image_list: &image_list
+  - "gcc:12"
+  - "gcc:13"
+  - "gcc:14"
+  - "gcc:15"
+  - "silkeh/clang:17"
+  - "silkeh/clang:18"
+  - "silkeh/clang:19"
+  - "silkeh/clang:20"
+
+.build_script: &build_script
+  - python3 -m venv venv
+  - source venv/bin/activate
+  - |
+    if [[ "$UPGRADE_PIP" == "true" ]]; then
+      pip install --upgrade pip setuptools wheel
+    fi
+  - mkdir -p build install && cd build
+  - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install
+  - make -j$(nproc) install
 
 default:
   interruptible: true
@@ -26,8 +49,10 @@ default:
       $CXX --version
     # Install the necessary libraries
     - |
-      apt-get update && apt-get install -y cmake git python3.11 python3.11-distutils python3.11-venv
-      update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+      apt-get update && apt-get install -y cmake git \
+        python${PYTHON_VERSION} python${PYTHON_VERSION}-distutils python${PYTHON_VERSION}-venv
+      update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1
+      echo "Using python: $(python3 --version)"
     - |
       git clone --branch release-1.12.0 --depth 1 https://github.com/google/googletest.git /tmp/googletest
       mkdir -p /tmp/googletest/build && cd /tmp/googletest/build
@@ -41,17 +66,20 @@ build:
   image: $IMAGE
   parallel:
     matrix:
-      - IMAGE: ['gcc:12', 'gcc:13', 'gcc:14', 'gcc:15', 'silkeh/clang:17', 'silkeh/clang:18', 'silkeh/clang:19', 'silkeh/clang:20']
-  script:
-    - python3 -m venv venv
-    - source venv/bin/activate
-    - mkdir -p build install && cd build
-    - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install && make -j$(nproc) install
+      - IMAGE: *image_list
+  script: *build_script
   artifacts:
     paths:
       - install/
       - venv/
     expire_in: 30 minutes
+
+upgrade-pip-and-build:
+  stage: build
+  image: "gcc:12"
+  variables:
+    UPGRADE_PIP: "true"
+  script: *build_script
 
 test:
   stage: test
@@ -59,9 +87,9 @@ test:
   image: $IMAGE
   parallel:
     matrix:
-      - IMAGE: ['gcc:12', 'gcc:13', 'gcc:14', 'gcc:15', 'silkeh/clang:17', 'silkeh/clang:18', 'silkeh/clang:19', 'silkeh/clang:20']
+      - IMAGE: *image_list
   script:
     - ./install/bin/unittests
     - source venv/bin/activate
-    - pip3 install scikit-learn
+    - pip install scikit-learn
     - python3 examples/PythonExample.py
