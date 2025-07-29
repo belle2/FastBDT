@@ -69,7 +69,7 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesConstantInSmallNumberO
     // The feature binning should be dominated by the sorting of the numbers
     // hence it does not scale with the number of layers to first order
     // for large layers this will be wrong ~ #Layer > 17
-    std::vector<unsigned int> sizes = {2, 3, 5, 7, 11, 13, 17};
+    std::vector<unsigned int> sizes = {2, 3, 5, 7, 11, 13, 17, 21};
     std::vector<double> times;
 
     for( auto &size : sizes ) {

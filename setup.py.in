@@ -1,7 +1,23 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 
-setup(name='PyFastBDT',
-      version='${FastBDT_VERSION_MAJOR}.${FastBDT_VERSION_MINOR}',
-      packages=['PyFastBDT'],
-      package_data={'PyFastBDT': ['*.so']},
-     )
+setup(
+    name='PyFastBDT',
+    version='${FastBDT_VERSION_MAJOR}.${FastBDT_VERSION_MINOR}',
+    author='Thomas Keck',
+    author_email='thomas.keck@cern.ch',
+    description='Python bindings for FastBDT, a gradient-boosted decision trees library',
+    url='https://github.com/thomaskeck/FastBDT',
+    packages=find_packages(),
+    include_package_data=True,
+    package_data={
+        'PyFastBDT': ['*.so'],
+    },
+    classifiers=[
+        'Programming Language :: Python :: 3',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+    ],
+    python_requires='>=3.7',
+    install_requires=[
+        'numpy>=1.20',
+    ],
+)

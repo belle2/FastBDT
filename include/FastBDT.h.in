@@ -16,6 +16,8 @@
 #include <map>
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <cstdint>
 
 namespace FastBDT {
 
