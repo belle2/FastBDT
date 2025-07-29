@@ -1,17 +1,14 @@
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.13)
 
-set(CMAKE_C_COMPILER gcc)
-set(CMAKE_CXX_COMPILER g++)
-
-project (FastBDT)
-set (FastBDT_VERSION_MAJOR 5)
-set (FastBDT_VERSION_MINOR 2)
+project(FastBDT)
+set(FastBDT_VERSION_MAJOR 5)
+set(FastBDT_VERSION_MINOR 2)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11 -Wall -Wextra -g -msse2")
 
-configure_file (
+configure_file(
   "${PROJECT_SOURCE_DIR}/include/FastBDT.h.in"
   "${PROJECT_BINARY_DIR}/include/FastBDT.h"
 )
