@@ -19,10 +19,11 @@ default:
 build:
   stage: build
   script:
+    - pwd
+    - cd ${CI_PROJECT_DIR}
     - python3 -m venv venv
     - source venv/bin/activate
-    - mkdir -p build install
-    - cd build
+    - mkdir -p build install && cd build
     - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install
     - make -j$(nproc) install
   artifacts:
@@ -36,6 +37,8 @@ test:
   needs:
     - build
   script:
+    - pwd
+    - cd ${CI_PROJECT_DIR}
     - ./install/bin/unittests
     - source venv/bin/activate
     - pip3 install scikit-learn
