@@ -15,12 +15,11 @@ default:
     - mkdir -p /tmp/googletest/build && cd /tmp/googletest/build
     - cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr
     - make -j$(nproc) install
+    - cd ${CI_PROJECT_DIR}
 
 build:
   stage: build
   script:
-    - pwd
-    - cd ${CI_PROJECT_DIR}
     - python3 -m venv venv
     - source venv/bin/activate
     - mkdir -p build install && cd build
@@ -30,15 +29,13 @@ build:
     paths:
       - install/
       - venv/
-    expire_in: 1s
+    expire_in: 10 minutes
 
 test:
   stage: test
   needs:
     - build
   script:
-    - pwd
-    - cd ${CI_PROJECT_DIR}
     - ./install/bin/unittests
     - source venv/bin/activate
     - pip3 install scikit-learn
