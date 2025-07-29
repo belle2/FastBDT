@@ -1,0 +1,33 @@
+stages:
+  - test
+
+variables:
+  DEBIAN_FRONTEND: 'noninteractive'
+
+default:
+  image: gcc:12
+  interruptible: true
+  before_script:
+    - apt-get update
+    - apt-get install -y  cmake git python3.11 python3.11-distutils python3.11-venv
+    - update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+    - git clone --branch release-1.12.0 --depth 1 https://github.com/google/googletest.git /tmp/googletest
+    - mkdir -p /tmp/googletest/build
+    - cd /tmp/googletest/build
+    - cmake .. -DBUILD_SHARED_LIBS=ON -DPYTHON_EXECUTABLE=`which python3`
+    - make -j$(nproc) install
+    - export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+    - cd ${CI_PROJECT_DIR}
+    - python3 -m venv venv
+    - source venv/bin/activate
+    - mkdir -p build
+    - mkdir -p install
+    - cd ${CI_PROJECT_DIR}/build
+    - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install
+    - make -j$(nproc) install
+    - cd ${CI_PROJECT_DIR}
+
+test:
+  stage: test
+  script:
+    - ./install/bin/unittests
