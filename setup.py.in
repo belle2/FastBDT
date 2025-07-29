@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='PyFastBDT',
-    version='${FastBDT_VERSION_MAJOR}.${FastBDT_VERSION_MINOR}',
+    version='@FastBDT_VERSION_MAJOR@.@FastBDT_VERSION_MINOR@',
     author='Thomas Keck',
     author_email='thomas.keck@cern.ch',
     description='Python bindings for FastBDT, a gradient-boosted decision trees library',
