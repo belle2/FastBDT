@@ -36,7 +36,7 @@ build:
   image: $IMAGE
   parallel:
     matrix:
-      - IMAGE: ['gcc:10', 'gcc:11', 'gcc:12', 'gcc:13', 'gcc:14', 'gcc:15', 'silkeh/clang:17', 'silkeh/clang:18', 'silkeh/clang:19', 'silkeh/clang:20']
+      - IMAGE: ['gcc:12', 'gcc:13', 'gcc:14', 'gcc:15', 'silkeh/clang:17', 'silkeh/clang:18', 'silkeh/clang:19', 'silkeh/clang:20']
   script:
     - python3 -m venv venv
     - source venv/bin/activate
@@ -54,7 +54,7 @@ test:
   image: $IMAGE
   parallel:
     matrix:
-      - IMAGE: ['gcc:10', 'gcc:11', 'gcc:12', 'gcc:13', 'gcc:14', 'gcc:15', 'silkeh/clang:17', 'silkeh/clang:18', 'silkeh/clang:19', 'silkeh/clang:20']
+      - IMAGE: ['gcc:12', 'gcc:13', 'gcc:14', 'gcc:15', 'silkeh/clang:17', 'silkeh/clang:18', 'silkeh/clang:19', 'silkeh/clang:20']
   script:
     - ./install/bin/unittests
     - source venv/bin/activate
