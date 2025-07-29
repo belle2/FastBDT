@@ -4,11 +4,12 @@ stages:
 
 variables:
   DEBIAN_FRONTEND: "noninteractive"
+  DEFAULT_IMAGE: "gcc:12"
   PYTHON_VERSION: "3.11"
   UPGRADE_PIP: "false"
 
 .image_list: &image_list
-  - "gcc:12"
+  - "${DEFAULT_IMAGE}"
   - "gcc:13"
   - "gcc:14"
   - "gcc:15"
@@ -34,14 +35,14 @@ default:
     - echo "Running job \"${CI_JOB_NAME}\" with the image \"${CI_JOB_IMAGE}\"..."
     # Select the correct compiler according to the image
     - |
-      if [[ "$IMAGE" == gcc:* ]]; then
+      if [[ "${IMAGE}" == gcc:* ]]; then
         export CC=gcc
         export CXX=g++
-      elif [[ "$IMAGE" == silkeh/clang:* ]]; then
+      elif [[ "${IMAGE}" == silkeh/clang:* ]]; then
         export CC=clang
         export CXX=clang++
       else
-        echo "Unknown compiler image: $IMAGE"
+        echo "Unknown compiler image: ${IMAGE}"
         exit 1
       fi
       echo "Using compiler: $CC / $CXX"
@@ -76,7 +77,10 @@ build:
 
 upgrade-pip-and-build:
   stage: build
-  image: "gcc:12"
+  image: $IMAGE
+  parallel:
+    matrix:
+      - IMAGE: "${DEFAULT_IMAGE}"
   variables:
     UPGRADE_PIP: "true"
   script: *build_script
