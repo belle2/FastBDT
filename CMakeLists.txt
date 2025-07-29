@@ -40,8 +40,8 @@ set(FastBDT_HEADERS
 )
 
 set(FastBDT_CINTERFACE
-    "${PROJECT_SOURCE_DIR}/src/FastBDT_C_API.cxx"
-    "${PROJECT_SOURCE_DIR}/include/FastBDT_C_API.h" 
+  "${PROJECT_SOURCE_DIR}/src/FastBDT_C_API.cxx"
+  "${PROJECT_SOURCE_DIR}/include/FastBDT_C_API.h"
 )
 
 set(FastBDT_Python
@@ -57,10 +57,10 @@ add_library(FastBDT_shared SHARED ${FastBDT_SOURCES} ${FastBDT_HEADERS})
 target_link_libraries(FastBDT_shared)
 
 install(TARGETS FastBDT_static FastBDT_shared FastBDT_CInterface
-     LIBRARY DESTINATION lib
-      ARCHIVE DESTINATION lib
-      RUNTIME DESTINATION bin   
-   )
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
 install(FILES ${FastBDT_HEADERS} DESTINATION include)
 
@@ -70,27 +70,45 @@ if(GTEST_FOUND)
   target_link_libraries(unittests ${GTEST_BOTH_LIBRARIES} FastBDT_static pthread)
   message(STATUS  ${GTEST_INCLUDE_DIRS})
   target_include_directories(unittests PUBLIC ${GTEST_INCLUDE_DIRS})
+
   install(TARGETS unittests DESTINATION bin)
 else()
   message(STATUS "Could not find gtest installation, skip building unittests.")
 endif()
 
 find_program(PYTHON "python3")
-
-if (PYTHON)
+if(PYTHON)
   configure_file(
     "${PROJECT_SOURCE_DIR}/setup.py.in"
     "${PROJECT_BINARY_DIR}/setup.py"
   )
-  add_custom_target(PyFastBDT ALL DEPENDS ${FastBDT_Python} FastBDT_shared FastBDT_CInterface)
-  add_custom_command(TARGET PyFastBDT PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/PyFastBDT" "${CMAKE_BINARY_DIR}/PyFastBDT"
+  add_custom_command(
+    OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/PyFastBDT" "${PROJECT_BINARY_DIR}/PyFastBDT"
+    COMMAND ${CMAKE_COMMAND} -E touch "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
+  )
+  add_custom_target(copy_pyfastbdt_sources ALL
+    DEPENDS "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
+  )
+  add_custom_command(
+    OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.libs_copied"
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:FastBDT_shared> "${PROJECT_BINARY_DIR}/PyFastBDT/"
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:FastBDT_CInterface> "${PROJECT_BINARY_DIR}/PyFastBDT/"
-    COMMAND ${PYTHON} -m pip install . --no-deps --prefix=${CMAKE_INSTALL_PREFIX}
-    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/build/timestamp"
+    COMMAND ${CMAKE_COMMAND} -E touch "${PROJECT_BINARY_DIR}/PyFastBDT/.libs_copied"
+    DEPENDS FastBDT_shared FastBDT_CInterface
   )
+  add_custom_target(copy_shared_libs ALL
+    DEPENDS "${PROJECT_BINARY_DIR}/PyFastBDT/.libs_copied"
+  )
+  add_custom_target(PyFastBDT ALL
+    DEPENDS copy_pyfastbdt_sources copy_shared_libs
+  )
+  add_custom_command(TARGET PyFastBDT POST_BUILD
+    COMMAND ${PYTHON} -m pip install .
+    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}"
+  )
+else()
+  message(STATUS "Could not find python3, skipping installation of python bindings.")
 endif()
 
 set(CPACK_PACKAGE_VERSION "${FastBDT_VERSION_MAJOR}.${FastBDT_VERSION_MINOR}")
