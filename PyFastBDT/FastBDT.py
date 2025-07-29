@@ -136,7 +136,7 @@ class Classifier(object):
 
     def fit(self, X, y, weights=None):
         X_temp = np.require(X, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
-        y_temp = np.require(y, dtype=np.bool, requirements=['A', 'W', 'C', 'O'])
+        y_temp = np.require(y, dtype=bool, requirements=['A', 'W', 'C', 'O'])
         if weights is not None:
             w_temp = np.require(weights, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
         numberOfEvents, numberOfFeatures = X_temp.shape
