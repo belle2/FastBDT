@@ -75,6 +75,7 @@ endif()
 
 find_program(PYTHON "python3")
 if(PYTHON)
+  # Configure files
   configure_file(
     "${PROJECT_SOURCE_DIR}/setup.py.in"
     "${PROJECT_BINARY_DIR}/setup.py"
@@ -84,25 +85,15 @@ if(PYTHON)
     "${PROJECT_BINARY_DIR}/pyproject.toml"
   )
   add_custom_command(
-    OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
+    OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.installed"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/PyFastBDT" "${PROJECT_BINARY_DIR}/PyFastBDT"
-    COMMAND ${CMAKE_COMMAND} -E touch "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
-  )
-  add_custom_target(copy_pyfastbdt_sources ALL
-    DEPENDS "${PROJECT_BINARY_DIR}/PyFastBDT/.copied"
-  )
-  add_custom_command(
-    OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.libs_copied"
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:FastBDT_shared> "${PROJECT_BINARY_DIR}/PyFastBDT/"
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:FastBDT_CInterface> "${PROJECT_BINARY_DIR}/PyFastBDT/"
-    COMMAND ${CMAKE_COMMAND} -E touch "${PROJECT_BINARY_DIR}/PyFastBDT/.libs_copied"
+    COMMAND ${CMAKE_COMMAND} -E touch "${PROJECT_BINARY_DIR}/PyFastBDT/.installed"
     DEPENDS FastBDT_shared FastBDT_CInterface
   )
-  add_custom_target(copy_shared_libs ALL
-    DEPENDS "${PROJECT_BINARY_DIR}/PyFastBDT/.libs_copied"
-  )
   add_custom_target(PyFastBDT ALL
-    DEPENDS copy_pyfastbdt_sources copy_shared_libs
+    DEPENDS "${PROJECT_BINARY_DIR}/PyFastBDT/.installed"
   )
   add_custom_command(TARGET PyFastBDT POST_BUILD
     COMMAND ${PYTHON} -m pip install .
@@ -116,7 +107,7 @@ set(CPACK_PACKAGE_VERSION "${FastBDT_VERSION_MAJOR}.${FastBDT_VERSION_MINOR}")
 set(CPACK_GENERATOR "RPM;DEB;TGZ")
 set(CPACK_PACKAGE_NAME "FastBDT")
 set(CPACK_PACKAGE_RELEASE 1)
-set(CPACK_PACKAGE_CONTACT "thomas.keck2@kit.edu")
+set(CPACK_PACKAGE_CONTACT "software@belle2.org")
 set(CPACK_PACKAGE_VENDOR "Private")
 set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_PACKAGE_RELEASE}.${CMAKE_SYSTEM_PROCESSOR}")
