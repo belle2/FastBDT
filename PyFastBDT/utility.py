@@ -32,14 +32,3 @@ def flatness(probability, feature, target, weights=None, classes=[0, 1]):
         diff = (hist_n.T - hist_inc)**2
         flatness_score += diff.sum() / (100*99)
     return np.sqrt(flatness_score)
-
-
-
-def auc_roc(probability, target):
-    N = len(target)
-    T = np.sum(target)
-    index = np.argsort(probability)
-    efficiency = (T - np.cumsum(target[index])) / float(T)
-    purity = (T - np.cumsum(target[index])) / (N - np.cumsum(np.ones(N)))
-    purity = np.where(np.isnan(purity), 0, purity)
-    return np.abs(np.trapz(purity, efficiency))
