@@ -104,7 +104,7 @@ test:
     - cd ${CI_PROJECT_DIR}/examples
     - |
       ${CXX} IRISExample.cxx -o IRISExample -O3 \
-      -l FastBDT_shared \
+      -l FastBDT_static \
       -L ${CI_PROJECT_DIR}/install/lib \
       -I ${CI_PROJECT_DIR}/install/include
       ./IRISExample iris.csv
