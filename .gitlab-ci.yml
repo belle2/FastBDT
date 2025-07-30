@@ -22,7 +22,7 @@ variables:
   - python3 -m venv venv
   - source venv/bin/activate
   - |
-    if [[ "$UPGRADE_PIP" == "true" ]]; then
+    if [[ "$UPGRADE_PIP" != "false" ]]; then
       pip install --upgrade pip setuptools wheel
     fi
   - mkdir -p build install && cd build
