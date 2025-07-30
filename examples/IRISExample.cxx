@@ -1,5 +1,6 @@
 /**
  * Thomas Keck 2017
+ * Giacomo De Pietro 2025
  */
 
 #include "Classifier.h"

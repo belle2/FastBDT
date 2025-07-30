@@ -1,3 +1,7 @@
+#
+# Thomas Keck 2017
+#
+
 import sys
 from PyFastBDT import FastBDT
 
