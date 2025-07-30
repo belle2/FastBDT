@@ -2,7 +2,6 @@ import sys
 from PyFastBDT import FastBDT
 
 import numpy as np
-import sklearn.metrics
 
 if __name__ == '__main__':
 
@@ -29,7 +28,7 @@ if __name__ == '__main__':
     clf = FastBDT.Classifier()
     clf.fit(X=X_train, y=y_train)
     p = clf.predict(X_test)
-    global_auc = sklearn.metrics.roc_auc_score(y_test, p)
+    global_auc = FastBDT.calculate_roc_auc(p, y_test)
     print("Global AUC", global_auc)
 
     # Intern feature importance is calculated using the sum of the information gains
@@ -60,15 +59,15 @@ if __name__ == '__main__':
     for event in events:
         print(clf.individualFeatureImportance(event))
     
-    # Train FastBDT using its PythonInterface, which is based on the SKLearn classifiers
+    # Train FastBDT using its PythonInterface, which is based on the scikit-learn classifiers
     clf = FastBDT.Classifier(purityTransformation=[False, False, False, False, False], subsample=1.0)
     clf.fit(X=X_train, y=y_train)
     p = clf.predict(X_test)
-    global_auc = sklearn.metrics.roc_auc_score(y_test, p)
+    global_auc = FastBDT.calculate_roc_auc(p, y_test)
     print("Global AUC without Purity Transformation", global_auc)
 
     clf = FastBDT.Classifier(purityTransformation=[True, True, True, True, True], subsample=1.0)
     clf.fit(X=X_train, y=y_train)
     p = clf.predict(X_test)
-    global_auc = sklearn.metrics.roc_auc_score(y_test, p)
+    global_auc = FastBDT.calculate_roc_auc(p, y_test)
     print("Global AUC with Purity Transformation", global_auc)
