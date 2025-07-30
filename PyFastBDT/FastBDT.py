@@ -10,7 +10,7 @@ c_float_p = ctypes.POINTER(ctypes.c_float)
 c_bool_p = ctypes.POINTER(ctypes.c_bool)
 c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
-FastBDT_library =  ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__),'libFastBDT_CInterface.so'))
+FastBDT_library = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libFastBDT_CInterface.so'))
 
 FastBDT_library.Create.restype = ctypes.c_void_p
 FastBDT_library.Delete.argtypes = [ctypes.c_void_p]
@@ -60,7 +60,6 @@ FastBDT_library.SetSPlot.argtypes = [ctypes.c_void_p, ctypes.c_bool]
 FastBDT_library.GetSPlot.argtypes = [ctypes.c_void_p]
 FastBDT_library.GetSPlot.restypes = ctypes.c_bool
 
-
 FastBDT_library.GetVariableRanking.argtypes = [ctypes.c_void_p]
 FastBDT_library.GetVariableRanking.restype = ctypes.c_void_p
 FastBDT_library.DeleteVariableRanking.argtypes = [ctypes.c_void_p]
@@ -68,7 +67,7 @@ FastBDT_library.ExtractNumberOfVariablesFromVariableRanking.argtypes = [ctypes.c
 FastBDT_library.ExtractNumberOfVariablesFromVariableRanking.restype = ctypes.c_uint
 FastBDT_library.ExtractImportanceOfVariableFromVariableRanking.argtypes = [ctypes.c_void_p, ctypes.c_uint]
 FastBDT_library.ExtractImportanceOfVariableFromVariableRanking.restype = ctypes.c_double
-    
+
 FastBDT_library.GetIndividualVariableRanking.argtypes = [ctypes.c_void_p, c_float_p]
 FastBDT_library.GetIndividualVariableRanking.restype = ctypes.c_void_p
 
@@ -96,7 +95,18 @@ def calculate_roc_auc(p, t, w=None):
 
 
 class Classifier(object):
-    def __init__(self, binning=[], nTrees=100, depth=3, shrinkage=0.1, subsample=0.5, transform2probability=True, purityTransformation=[], sPlot=False, flatnessLoss=-1.0, numberOfFlatnessFeatures=0):
+    def __init__(
+            self,
+            binning=[],
+            nTrees=100,
+            depth=3,
+            shrinkage=0.1,
+            subsample=0.5,
+            transform2probability=True,
+            purityTransformation=[],
+            sPlot=False,
+            flatnessLoss=-1.0,
+            numberOfFlatnessFeatures=0):
         """
         @param binning list of numbers with the power N used for each feature binning e.g. 8 means 2^8 bins
         @param nTrees number of trees
@@ -131,7 +141,10 @@ class Classifier(object):
         FastBDT_library.SetFlatnessLoss(forest, float(self.flatnessLoss))
         FastBDT_library.SetTransform2Probability(forest, bool(self.transform2probability))
         FastBDT_library.SetSPlot(forest, bool(self.sPlot))
-        FastBDT_library.SetPurityTransformation(forest, np.array(self.purityTransformation).ctypes.data_as(c_uint_p), int(len(self.purityTransformation)))
+        FastBDT_library.SetPurityTransformation(
+            forest, np.array(self.purityTransformation).ctypes.data_as(c_uint_p),
+            int(len(self.purityTransformation))
+        )
         return forest
 
     def fit(self, X, y, weights=None):
@@ -140,18 +153,23 @@ class Classifier(object):
         if weights is not None:
             w_temp = np.require(weights, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
         numberOfEvents, numberOfFeatures = X_temp.shape
-        FastBDT_library.Fit(self.forest, X_temp.ctypes.data_as(c_float_p),
-                              w_temp.ctypes.data_as(c_float_p) if weights is not None else None,
-                              y_temp.ctypes.data_as(c_bool_p), int(numberOfEvents), int(numberOfFeatures))
+        FastBDT_library.Fit(
+            self.forest, X_temp.ctypes.data_as(c_float_p),
+            w_temp.ctypes.data_as(c_float_p) if weights is not None else None,
+            y_temp.ctypes.data_as(c_bool_p), int(numberOfEvents), int(numberOfFeatures)
+        )
         return self
 
     def predict(self, X):
         X_temp = np.require(X, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
         N = len(X)
         p = np.require(np.zeros(N), dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
-        FastBDT_library.PredictArray(self.forest, X_temp.ctypes.data_as(c_float_p), p.ctypes.data_as(c_float_p), int(X_temp.shape[0]))
+        FastBDT_library.PredictArray(
+            self.forest, X_temp.ctypes.data_as(c_float_p),
+            p.ctypes.data_as(c_float_p), int(X_temp.shape[0])
+        )
         return p
-    
+
     def predict_single(self, row):
         return FastBDT_library.Predict(self.forest, row.ctypes.data_as(c_float_p))
 
@@ -160,7 +178,7 @@ class Classifier(object):
 
     def load(self, weightfile):
         FastBDT_library.Load(self.forest, bytes(weightfile, 'utf-8'))
-    
+
     def individualFeatureImportance(self, X):
         X_temp = np.require(X, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
         _ranking = FastBDT_library.GetIndividualVariableRanking(self.forest, X_temp.ctypes.data_as(c_float_p))
@@ -188,7 +206,10 @@ class Classifier(object):
         numberOfEvents, numberOfFeatures = X.shape
         global_auc = calculate_roc_auc(self.predict(X_test), y_test, weights_test)
         forest = self.forest
-        importances = self._externFeatureImportance(list(range(numberOfFeatures)), global_auc, X, y, weights, X_test, y_test, weights_test)
+        importances = self._externFeatureImportance(
+            list(range(numberOfFeatures)),
+            global_auc, X, y, weights, X_test, y_test, weights_test
+        )
         self.forest = forest
         return importances
 
@@ -203,14 +224,17 @@ class Classifier(object):
             auc = calculate_roc_auc(self.predict(X_test_temp), y_test, weights_test)
             FastBDT_library.Delete(self.forest)
             importances[i] = global_auc - auc
-   
+
         most_important = max(importances.keys(), key=lambda x: importances[x])
         remaining_features = [v for v in features if v != most_important]
         if len(remaining_features) == 1:
             return importances
-    
+
         importances = {most_important: importances[most_important]}
-        rest = self._externFeatureImportance(remaining_features, global_auc - importances[most_important], X, y, weights, X_test, y_test, weights_test)
+        rest = self._externFeatureImportance(
+            remaining_features, global_auc - importances[most_important],
+            X, y, weights, X_test, y_test, weights_test
+        )
         importances.update(rest)
         return importances
 
