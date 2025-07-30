@@ -63,10 +63,10 @@ install(FILES ${FastBDT_HEADERS} DESTINATION include)
 
 find_package(GTest)
 if(GTEST_FOUND)
-  add_executable(unittests ${FastBDT_TESTS} ${FastBDT_HEADERS} ${FastBDT_CINTERFACE})
-  target_link_libraries(unittests ${GTEST_BOTH_LIBRARIES} FastBDT_static pthread)
+  add_executable(fastbdt-unittests ${FastBDT_TESTS} ${FastBDT_HEADERS} ${FastBDT_CINTERFACE})
+  target_link_libraries(fastbdt-unittests ${GTEST_BOTH_LIBRARIES} FastBDT_static pthread)
   message(STATUS  ${GTEST_INCLUDE_DIRS})
-  target_include_directories(unittests PUBLIC ${GTEST_INCLUDE_DIRS})
+  target_include_directories(fastbdt-unittests PUBLIC ${GTEST_INCLUDE_DIRS})
 
   install(TARGETS unittests DESTINATION bin)
 else()

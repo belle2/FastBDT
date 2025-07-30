@@ -26,6 +26,7 @@ variables:
     fi
   - mkdir -p build install && cd build
   - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install
+  - make -j$(nproc)
   - make -j$(nproc) install
 
 default:
@@ -99,7 +100,7 @@ test:
       - IMAGE: *image_list
   script:
     # Run the unit tests
-    - ./install/bin/unittests
+    - ./install/bin/fastbdt-unittests
     # Run all the main examples
     - cd ${CI_PROJECT_DIR}/examples
     - |
