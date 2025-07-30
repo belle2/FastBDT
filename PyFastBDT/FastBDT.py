@@ -78,20 +78,24 @@ def PrintVersion():
 
 def calculate_roc_auc(p, t, w=None):
     """
-    Calculates the area under the receiver oeprating characteristic curve (AUC ROC)
-    @param p np.array filled with the probability output of a classifier
-    @param t np.array filled with the target (0 or 1)
+    Calculates the area under the receiver operating characteristic curve (AUC ROC)
+    @param p: np.array of predicted probabilities
+    @param t: np.array of binary target labels (0 or 1)
+    @param w: optional np.array of sample weights
+    @return: scalar AUC ROC value
     """
     if w is None:
-        w = np.ones(len(t))
+        w = np.ones_like(t)
+    t_w = t * w
+    T = t_w.sum()
     N = w.sum()
-    T = np.sum(t*w)
-    t = t*w
     index = np.argsort(p)
-    efficiency = (T - np.cumsum(t[index])) / float(T)
-    purity = (T - np.cumsum(t[index])) / (N - np.cumsum(w))
-    purity = np.where(np.isnan(purity), 0, purity)
-    return np.abs(np.trapz(purity, efficiency))
+    cum_t = np.cumsum(t_w[index])
+    cum_w = np.cumsum(w[index])
+    # Exclude the last bin to avoid a division by 0
+    purity = (T - cum_t[:-1]) / (N - cum_w[:-1])
+    efficiency = (T - cum_t[:-1]) / T
+    return np.abs(np.trapezoid(purity, efficiency))
 
 
 class Classifier(object):
