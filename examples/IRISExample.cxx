@@ -128,13 +128,13 @@ int main(int argc, char* argv[])
 
   std::cout << "Score " << getIrisScore(classifier, X, y) << std::endl;
 
-  std::fstream out_stream("unittest.weightfile", std::ios_base::out | std::ios_base::trunc);
+  std::fstream out_stream("unittest_cxx.weightfile", std::ios_base::out | std::ios_base::trunc);
   out_stream << classifier << std::endl;
   out_stream.close();
 
   classifier.Print();
 
-  std::fstream in_stream("unittest.weightfile", std::ios_base::in);
+  std::fstream in_stream("unittest_cxx.weightfile", std::ios_base::in);
   FastBDT::Classifier classifier2(in_stream);
 
   std::cout << "Score " << getIrisScore(classifier2, X, y) << std::endl;
