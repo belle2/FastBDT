@@ -68,7 +68,7 @@ if(GTEST_FOUND)
   message(STATUS  ${GTEST_INCLUDE_DIRS})
   target_include_directories(fastbdt-unittests PUBLIC ${GTEST_INCLUDE_DIRS})
 
-  install(TARGETS unittests DESTINATION bin)
+  install(TARGETS fastbdt-unittests DESTINATION bin)
 else()
   message(STATUS "Could not find gtest installation, skip building unittests.")
 endif()
