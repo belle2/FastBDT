@@ -107,6 +107,6 @@ test:
       -l FastBDT_shared \
       -L ${CI_PROJECT_DIR}/install/lib \
       -I ${CI_PROJECT_DIR}/install/include
-      IRISExample iris.csv
+      ./IRISExample iris.csv
     - python3 iris_example.py iris.csv
     - python3 generic_example.py
