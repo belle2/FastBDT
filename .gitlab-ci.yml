@@ -4,13 +4,12 @@ stages:
 
 variables:
   DEBIAN_FRONTEND: "noninteractive"
-  DEFAULT_IMAGE: "gcc:12"
   PYTHON_VERSION: "3.11"
   PYTHON_VERSION_FOR_INTEL: "3.12"
   UPGRADE_PIP: "false"
 
 .image_list: &image_list
-  - "${DEFAULT_IMAGE}"
+  - "gcc:12"
   - "gcc:13"
   - "gcc:14"
   - "gcc:15"
@@ -86,7 +85,8 @@ build-with-upgraded-pip:
   image: ${IMAGE}
   parallel:
     matrix:
-      - IMAGE: "${DEFAULT_IMAGE}"
+      # One image is enough. The first one in the list above is selected.
+      - IMAGE: "gcc:12"
   variables:
     UPGRADE_PIP: "true"
   script: *build_script
