@@ -5,8 +5,8 @@ stages:
 variables:
   DEBIAN_FRONTEND: "noninteractive"
   DEFAULT_IMAGE: "gcc:12"
-  INTEL_IMAGE: "intel/oneapi-basekit:2025.2.0-0-devel-ubuntu24.04"
   PYTHON_VERSION: "3.11"
+  PYTHON_VERSION_FOR_INTEL: "3.12"
   UPGRADE_PIP: "false"
 
 .image_list: &image_list
@@ -18,6 +18,7 @@ variables:
   - "silkeh/clang:18"
   - "silkeh/clang:19"
   - "silkeh/clang:20"
+  - "intel/oneapi-basekit:2025.2.0-0-devel-ubuntu24.04"
 
 .build_script: &build_script
   - python3 -m venv venv
@@ -45,6 +46,7 @@ default:
       elif [[ "${IMAGE}" == intel/oneapi-basekit:* ]]; then
         export CC=icx
         export CXX=icpx
+        export PYTHON_VERSION=${PYTHON_VERSION_FOR_INTEL}
       else
         echo "Unknown compiler image: ${IMAGE}"
         exit 1
@@ -78,16 +80,6 @@ build:
       - install/
       - venv/
     expire_in: 30 minutes
-
-build-with-intel-compiler:
-  stage: build
-  image: ${IMAGE}
-  parallel:
-    matrix:
-      - IMAGE: "${INTEL_IMAGE}"
-  variables:
-    PYTHON_VERSION: "3.12"
-  script: *build_script
 
 build-with-upgraded-pip:
   stage: build
