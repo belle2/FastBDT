@@ -103,10 +103,10 @@ test:
     # Run all the main examples
     - cd ${CI_PROJECT_DIR}/examples
     - |
-      g++ IRISExample.cxx -o IRISExample -O3 \
+      ${CXX} IRISExample.cxx -o IRISExample -O3 \
       -l FastBDT_shared \
       -L ${CI_PROJECT_DIR}/install/lib \
-      -I /home/ubuntu/test_fastbdt/FastBDT/install/include
+      -I ${CI_PROJECT_DIR}/install/include
       IRISExample iris.csv
     - python3 iris_example.py iris.csv
     - python3 generic_example.py
