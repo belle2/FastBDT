@@ -5,6 +5,7 @@ stages:
 variables:
   DEBIAN_FRONTEND: "noninteractive"
   DEFAULT_IMAGE: "gcc:12"
+  INTEL_IMAGE: "intel/oneapi-basekit:2025.2.0-0-devel-ubuntu24.04"
   PYTHON_VERSION: "3.11"
   UPGRADE_PIP: "false"
 
@@ -41,6 +42,9 @@ default:
       elif [[ "${IMAGE}" == silkeh/clang:* ]]; then
         export CC=clang
         export CXX=clang++
+      elif [[ "${IMAGE}" == intel/oneapi-basekit:* ]]; then
+        export CC=icx
+        export CXX=icpx
       else
         echo "Unknown compiler image: ${IMAGE}"
         exit 1
@@ -52,7 +56,7 @@ default:
     - |
       apt-get update && apt-get install -y cmake git \
         python${PYTHON_VERSION} python${PYTHON_VERSION}-distutils python${PYTHON_VERSION}-venv
-      update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1
+      update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 2
       echo "Using python: $(python3 --version)"
     - |
       git clone --branch release-1.12.0 --depth 1 https://github.com/google/googletest.git /tmp/googletest
@@ -64,7 +68,7 @@ default:
 
 build:
   stage: build
-  image: $IMAGE
+  image: ${IMAGE}
   parallel:
     matrix:
       - IMAGE: *image_list
@@ -75,9 +79,19 @@ build:
       - venv/
     expire_in: 30 minutes
 
-upgrade-pip-and-build:
+build-with-intel-compiler:
   stage: build
-  image: $IMAGE
+  image: ${IMAGE}
+  parallel:
+    matrix:
+      - IMAGE: "${INTEL_IMAGE}"
+  variables:
+    PYTHON_VERSION: "3.12"
+  script: *build_script
+
+build-with-upgraded-pip:
+  stage: build
+  image: ${IMAGE}
   parallel:
     matrix:
       - IMAGE: "${DEFAULT_IMAGE}"
