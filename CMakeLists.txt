@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 project(FastBDT)
 set(FastBDT_VERSION_MAJOR 5)
-set(FastBDT_VERSION_MINOR 2)
+set(FastBDT_VERSION_MINOR 3)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
