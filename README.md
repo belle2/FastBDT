@@ -20,8 +20,10 @@ It is extensively used in high energy physics by the Belle II Collaboration.
 ### Warning
 
 This repository is a fork maintained by the Belle II Collaboration.
-It is guaranteed to compile with modern compilers, and unit tests as well as the main examples are known to work.
-However, **no further development is currently planned** in this fork.
+It is guaranteed to compile with modern compilers and the unit tests and main examples are fully functional, unless stated otherwise.
+However, **no further development of this fork is currently planned**.
+
+The original repository can be found at: https://github.com/thomaskeck/FastBDT
 
 ---
 
