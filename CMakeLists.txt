@@ -84,6 +84,10 @@ if(PYTHON)
     "${PROJECT_SOURCE_DIR}/pyproject.toml.in"
     "${PROJECT_BINARY_DIR}/pyproject.toml"
   )
+  configure_file(
+    "${PROJECT_SOURCE_DIR}/PyFastBDT/__init__.py.in"
+    "${PROJECT_BINARY_DIR}/PyFastBDT/__init__.py"
+  )
   add_custom_command(
     OUTPUT "${PROJECT_BINARY_DIR}/PyFastBDT/.installed"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/PyFastBDT" "${PROJECT_BINARY_DIR}/PyFastBDT"
@@ -94,11 +98,13 @@ if(PYTHON)
   )
   add_custom_target(PyFastBDT ALL
     DEPENDS "${PROJECT_BINARY_DIR}/PyFastBDT/.installed"
-  )
-  add_custom_command(TARGET PyFastBDT POST_BUILD
-    COMMAND ${PYTHON} -m pip install .
-    WORKING_DIRECTORY "${PROJECT_BINARY_DIR}"
-  )
+    )
+  install(CODE "
+    execute_process(
+      COMMAND ${PYTHON} -m pip install .
+      WORKING_DIRECTORY \"${PROJECT_BINARY_DIR}\"
+    )
+  ")
 else()
   message(STATUS "Could not find python3, skipping installation of python bindings.")
 endif()
