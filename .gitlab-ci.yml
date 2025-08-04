@@ -28,6 +28,7 @@ variables:
   - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install
   - make -j$(nproc)
   - make -j$(nproc) install
+  - python3 -c "import PyFastBDT;print('PyFastBDT version:', PyFastBDT.__version__)"
 
 default:
   interruptible: true
