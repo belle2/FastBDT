@@ -14,6 +14,8 @@
 
 using namespace FastBDT;
 
+constexpr int NTEST = 5;
+
 class PerformanceFeatureBinningTest : public ::testing::Test {
 protected:
   virtual void SetUp()
@@ -41,15 +43,23 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
 
   for (auto& size : sizes) {
     std::vector<float> temp_data(data.begin(), data.begin() + size);
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    FeatureBinning<float> binning(4, temp_data);
-    std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
 
-    // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
-    EXPECT_EQ(binning.GetNLevels(), 4u);
+    // Repeat the test few times and calculate the average time
+    double temp_times = 0.0;
+    for (unsigned short i = 0; i < NTEST; ++i) {
 
-    std::chrono::duration<double, std::micro> time = stop - start;
-    times.push_back(time.count());
+      std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+      FeatureBinning<float> binning(4, temp_data);
+      std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
+
+      // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
+      EXPECT_EQ(binning.GetNLevels(), 4u);
+
+      std::chrono::duration<double, std::micro> time = stop - start;
+      temp_times += time.count();
+    }
+
+    times.push_back(temp_times / NTEST);
   }
 
   // Check linear behaviour
@@ -57,7 +67,7 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
     double size_ratio = sizes[i] / static_cast<double>(sizes[0]);
     double time_ratio = times[i] / static_cast<double>(times[0]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.2);
+    EXPECT_LT(time_ratio,  size_ratio * 2.1);
   }
 
 }
@@ -100,7 +110,6 @@ protected:
 
 TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
 {
-
   auto random_source = std::bind(distribution, generator);
 
   unsigned int nFeatures = 10;
@@ -114,22 +123,29 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
     std::vector<unsigned int> row(nFeatures);
     std::vector<unsigned int> binning_levels(nFeatures, 4);
 
-    EventSample sample(nDataPoints, nFeatures, 0, binning_levels);
-    for (unsigned int i = 0; i < nDataPoints; ++i) {
-      std::generate_n(row.begin(), nFeatures, random_source);
-      sample.AddEvent(row, 1.0, i % 2 == 0);
+    // Repeat the test few times and calculate the average time
+    double temp_times = 0.0;
+    for (unsigned short i = 0; i < NTEST; ++i) {
+
+      EventSample sample(nDataPoints, nFeatures, 0, binning_levels);
+      for (unsigned int j = 0; j < nDataPoints; ++j) {
+        std::generate_n(row.begin(), nFeatures, random_source);
+        sample.AddEvent(row, 1.0, j % 2 == 0);
+      }
+
+      auto start = std::chrono::high_resolution_clock::now();
+      TreeBuilder dt(nLayers, sample);
+      auto stop = std::chrono::high_resolution_clock::now();
+
+      // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
+      const auto& purities = dt.GetPurities();
+      EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
+
+      std::chrono::duration<double, std::micro> time = stop - start;
+      temp_times += time.count();
     }
 
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    TreeBuilder dt(nLayers, sample);
-    std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
-
-    // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
-    const auto& purities = dt.GetPurities();
-    EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
-
-    std::chrono::duration<double, std::micro> time = stop - start;
-    times.push_back(time.count());
+    times.push_back(temp_times / NTEST);
   }
 
   // Check linear behaviour
@@ -137,13 +153,12 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
     double size_ratio = sizes[i] / static_cast<double>(sizes[0]);
     double time_ratio = times[i] / static_cast<double>(times[0]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.2);
+    EXPECT_LT(time_ratio,  size_ratio * 2.1);
   }
 }
 
 TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfFeatures)
 {
-
   auto random_source = std::bind(distribution, generator);
 
   unsigned int nLayers = 4;
@@ -152,39 +167,43 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfFeatures)
   std::vector<unsigned int> sizes = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512};
   std::vector<double> times;
 
-  for (auto& size : sizes) {
-    unsigned int nFeatures = size;
+  for (auto& nFeatures : sizes) {
     std::vector<unsigned int> row(nFeatures);
     std::vector<unsigned int> binning_levels(nFeatures, 4);
 
-    EventSample sample(nDataPoints, nFeatures, 0, binning_levels);
-    for (unsigned int i = 0; i < nDataPoints; ++i) {
-      std::generate_n(row.begin(), nFeatures, random_source);
-      sample.AddEvent(row, 1.0, i % 2 == 0);
+    // Repeat the test few times and calculate the average time
+    double temp_times = 0.0;
+    for (unsigned short i = 0; i < NTEST; ++i) {
+
+      EventSample sample(nDataPoints, nFeatures, 0, binning_levels);
+      for (unsigned int j = 0; j < nDataPoints; ++j) {
+        std::generate_n(row.begin(), nFeatures, random_source);
+        sample.AddEvent(row, 1.0, j % 2 == 0);
+      }
+
+      auto start = std::chrono::high_resolution_clock::now();
+      TreeBuilder dt(nLayers, sample);
+      auto stop = std::chrono::high_resolution_clock::now();
+
+      // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
+      const auto& purities = dt.GetPurities();
+      EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
+
+      std::chrono::duration<double, std::micro> time = stop - start;
+      temp_times += time.count();
     }
 
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    TreeBuilder dt(nLayers, sample);
-    std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
-
-    // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
-    const auto& purities = dt.GetPurities();
-    EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
-
-    std::chrono::duration<double, std::micro> time = stop - start;
-    times.push_back(time.count());
+    times.push_back(temp_times / NTEST);
   }
 
   // Check linear behaviour
-  // We ignore the first measurement, to avoids effects of caching
-  for (unsigned int i = 2; i < sizes.size(); ++i) {
+  for (unsigned int i = 1; i < sizes.size(); ++i) {
     double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
     double time_ratio = times[i] / static_cast<double>(times[1]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.2);
+    EXPECT_LT(time_ratio,  size_ratio * 2.1);
   }
 }
-
 
 TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers)
 {
@@ -212,29 +231,37 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers
   for (auto& size : sizes) {
     unsigned int nLayers = size;
 
-    // Reset flags, so we can use the sample multiple times
-    auto& flags = sample.GetFlags();
-    for (unsigned int iEvent = 0; iEvent < nDataPoints; ++iEvent)
-      flags.Set(iEvent, 1);
+    double temp_times = 0.0;
+    for (unsigned short i = 0; i < NTEST; ++i) {
 
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    TreeBuilder dt(nLayers, sample);
-    std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
+      // Copy the sample for this iteration so TreeBuilder can mutate it safely
+      EventSample sample_copy = sample;
 
-    // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
-    const auto& purities = dt.GetPurities();
-    EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
+      // Reset flags, so we can use the sample multiple times
+      auto& flags = sample_copy.GetFlags();
+      for (unsigned int iEvent = 0; iEvent < nDataPoints; ++iEvent)
+        flags.Set(iEvent, 1);
 
-    std::chrono::duration<double, std::micro> time = stop - start;
-    times.push_back(time.count());
+      auto start = std::chrono::high_resolution_clock::now();
+      TreeBuilder dt(nLayers, sample_copy);
+      auto stop = std::chrono::high_resolution_clock::now();
+
+      // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
+      const auto& purities = dt.GetPurities();
+      EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
+
+      std::chrono::duration<double, std::micro> time = stop - start;
+      temp_times += time.count();
+    }
+
+    times.push_back(temp_times / NTEST);
   }
 
   // Check linear behaviour
-  // We ignore the first measurement, to avoids effects of caching
-  for (unsigned int i = 2; i < sizes.size(); ++i) {
+  for (unsigned int i = 1; i < sizes.size(); ++i) {
     double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
     double time_ratio = times[i] / static_cast<double>(times[1]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.2);
+    EXPECT_LT(time_ratio,  size_ratio * 2.1);
   }
 }
