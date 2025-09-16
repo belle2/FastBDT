@@ -14,7 +14,7 @@
 
 using namespace FastBDT;
 
-constexpr int NTEST = 5;
+constexpr int TEST_ITERATIONS = 5;
 
 class PerformanceFeatureBinningTest : public ::testing::Test {
 protected:
@@ -45,8 +45,8 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
     std::vector<float> temp_data(data.begin(), data.begin() + size);
 
     // Repeat the test few times and calculate the average time
-    double temp_times = 0.0;
-    for (unsigned short i = 0; i < NTEST; ++i) {
+    double temp_time = 0.0;
+    for (unsigned short i = 0; i < TEST_ITERATIONS; ++i) {
 
       std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
       FeatureBinning<float> binning(4, temp_data);
@@ -56,10 +56,10 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
       EXPECT_EQ(binning.GetNLevels(), 4u);
 
       std::chrono::duration<double, std::micro> time = stop - start;
-      temp_times += time.count();
+      temp_time += time.count();
     }
 
-    times.push_back(temp_times / NTEST);
+    times.push_back(temp_time / TEST_ITERATIONS);
   }
 
   // Check linear behaviour
@@ -124,8 +124,8 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
     std::vector<unsigned int> binning_levels(nFeatures, 4);
 
     // Repeat the test few times and calculate the average time
-    double temp_times = 0.0;
-    for (unsigned short i = 0; i < NTEST; ++i) {
+    double temp_time = 0.0;
+    for (unsigned short i = 0; i < TEST_ITERATIONS; ++i) {
 
       EventSample sample(nDataPoints, nFeatures, 0, binning_levels);
       for (unsigned int j = 0; j < nDataPoints; ++j) {
@@ -142,10 +142,10 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
       EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
 
       std::chrono::duration<double, std::micro> time = stop - start;
-      temp_times += time.count();
+      temp_time += time.count();
     }
 
-    times.push_back(temp_times / NTEST);
+    times.push_back(temp_time / TEST_ITERATIONS);
   }
 
   // Check linear behaviour
@@ -172,8 +172,8 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfFeatures)
     std::vector<unsigned int> binning_levels(nFeatures, 4);
 
     // Repeat the test few times and calculate the average time
-    double temp_times = 0.0;
-    for (unsigned short i = 0; i < NTEST; ++i) {
+    double temp_time = 0.0;
+    for (unsigned short i = 0; i < TEST_ITERATIONS; ++i) {
 
       EventSample sample(nDataPoints, nFeatures, 0, binning_levels);
       for (unsigned int j = 0; j < nDataPoints; ++j) {
@@ -190,10 +190,10 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfFeatures)
       EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
 
       std::chrono::duration<double, std::micro> time = stop - start;
-      temp_times += time.count();
+      temp_time += time.count();
     }
 
-    times.push_back(temp_times / NTEST);
+    times.push_back(temp_time / TEST_ITERATIONS);
   }
 
   // Check linear behaviour
@@ -231,8 +231,8 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers
   for (auto& size : sizes) {
     unsigned int nLayers = size;
 
-    double temp_times = 0.0;
-    for (unsigned short i = 0; i < NTEST; ++i) {
+    double temp_time = 0.0;
+    for (unsigned short i = 0; i < TEST_ITERATIONS; ++i) {
 
       // Copy the sample for this iteration so TreeBuilder can mutate it safely
       EventSample sample_copy = sample;
@@ -251,10 +251,10 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers
       EXPECT_EQ(purities.size(), static_cast<unsigned int>((1 << (nLayers + 1)) - 1));
 
       std::chrono::duration<double, std::micro> time = stop - start;
-      temp_times += time.count();
+      temp_time += time.count();
     }
 
-    times.push_back(temp_times / NTEST);
+    times.push_back(temp_time / TEST_ITERATIONS);
   }
 
   // Check linear behaviour
