@@ -4,8 +4,6 @@ stages:
 
 variables:
   DEBIAN_FRONTEND: "noninteractive"
-  PYTHON_VERSION: "3.11"
-  PYTHON_VERSION_FOR_INTEL: "3.12"
   UPGRADE_PIP: "false"
 
 .image_list: &image_list
@@ -45,7 +43,6 @@ default:
       elif [[ "${IMAGE}" == intel/oneapi-basekit:* ]]; then
         export CC=icx
         export CXX=icpx
-        export PYTHON_VERSION=${PYTHON_VERSION_FOR_INTEL}
       else
         echo "Unknown compiler image: ${IMAGE}"
         exit 1
@@ -55,9 +52,7 @@ default:
       $CXX --version
     # Install the necessary libraries
     - |
-      apt-get update && apt-get install -y cmake git \
-        python${PYTHON_VERSION} python3-setuptools python${PYTHON_VERSION}-venv
-      update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 2
+      apt-get update && apt-get install -y cmake git python3 python3-setuptools python3-venv
       echo "Using python: $(python3 --version)"
     - |
       git clone --branch release-1.12.0 --depth 1 https://github.com/google/googletest.git /tmp/googletest
