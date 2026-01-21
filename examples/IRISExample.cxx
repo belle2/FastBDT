@@ -3,7 +3,7 @@
  * Giacomo De Pietro 2025
  */
 
-#include "Classifier.h"
+#include <Classifier.h>
 
 #include <iostream>
 #include <fstream>
@@ -62,7 +62,7 @@ public:
     return y;
   }
 
-  const std::vector<float>& getW() const
+  const std::vector<FastBDT::Weight>& getW() const
   {
     return _weights;
   }
@@ -83,7 +83,7 @@ private:
 
   std::vector<std::vector<float>> _X;
   std::vector<int> _labels;
-  std::vector<float> _weights;
+  std::vector<FastBDT::Weight> _weights;
 };
 
 
