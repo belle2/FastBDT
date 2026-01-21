@@ -10,6 +10,8 @@ extern "C" {
 
     void PrintVersion();
 
+    bool IsWeightFloat();
+
     struct Expertise {
       FastBDT::Classifier classifier;
     };

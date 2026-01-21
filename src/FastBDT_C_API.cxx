@@ -4,9 +4,10 @@
 
 #include "FastBDT_C_API.h"
 
+#include <iostream>
 #include <fstream>
 #include <new>
-#include <iostream>
+#include <type_traits>
 
 using namespace FastBDT;
 
@@ -15,6 +16,11 @@ extern "C" {
   void PrintVersion()
   {
     std::cerr << "FastBDT Version: " << FastBDT_VERSION_MAJOR << "." << FastBDT_VERSION_MINOR << std::endl;
+  }
+
+  bool IsWeightFloat()
+  {
+    return std::is_same<Weight, float>::value;
   }
 
   void* Create()
