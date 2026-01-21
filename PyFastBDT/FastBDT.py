@@ -10,13 +10,16 @@ c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
 FastBDT_library = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libFastBDT_CInterface.so'))
 
+FastBDT_library.IsWeightFloat.restype = ctypes.c_bool
+_is_weight_float = FastBDT_library.IsWeightFloat()
+
 FastBDT_library.Create.restype = ctypes.c_void_p
 FastBDT_library.Delete.argtypes = [ctypes.c_void_p]
 
 FastBDT_library.Load.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 FastBDT_library.Save.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
-FastBDT_library.Fit.argtypes = [ctypes.c_void_p, c_float_p, c_float_p, c_bool_p, ctypes.c_uint]
+FastBDT_library.Fit.argtypes = [ctypes.c_void_p, c_float_p, c_float_p if _is_weight_float else c_double_p, c_bool_p, ctypes.c_uint]
 
 FastBDT_library.Predict.argtypes = [ctypes.c_void_p, c_float_p]
 FastBDT_library.Predict.restype = ctypes.c_float
@@ -153,11 +156,11 @@ class Classifier(object):
         X_temp = np.require(X, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
         y_temp = np.require(y, dtype=bool, requirements=['A', 'W', 'C', 'O'])
         if weights is not None:
-            w_temp = np.require(weights, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
+            w_temp = np.require(weights, dtype=np.float32 if _is_weight_float else np.float64, requirements=['A', 'W', 'C', 'O'])
         numberOfEvents, numberOfFeatures = X_temp.shape
         FastBDT_library.Fit(
             self.forest, X_temp.ctypes.data_as(c_float_p),
-            w_temp.ctypes.data_as(c_float_p) if weights is not None else None,
+            w_temp.ctypes.data_as(c_float_p if _is_weight_float else c_double_p) if weights is not None else None,
             y_temp.ctypes.data_as(c_bool_p), int(numberOfEvents), int(numberOfFeatures)
         )
         return self

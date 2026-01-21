@@ -8,6 +8,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11 -Wall -Wextra -g -msse2")
 
+option(USE_DOUBLE_WEIGHT "Use double precision (double) for Weight instead of single precision (float)" OFF)
+if(USE_DOUBLE_WEIGHT)
+  message(STATUS "FastBDT: using double as type for Weight")
+  set(FastBDT_TYPE_WEIGHT "double")
+else()
+  message(STATUS "FastBDT: using float as type for Weight")
+  set(FastBDT_TYPE_WEIGHT "float")
+endif()
+
 configure_file(
   "${PROJECT_SOURCE_DIR}/include/FastBDT.h.in"
   "${PROJECT_BINARY_DIR}/include/FastBDT.h"

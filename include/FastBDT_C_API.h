@@ -10,6 +10,8 @@ extern "C" {
 
     void PrintVersion();
 
+    bool IsWeightFloat();
+
     struct Expertise {
       FastBDT::Classifier classifier;
     };
@@ -45,7 +47,7 @@ extern "C" {
     
     void Delete(void *ptr);
     
-    void Fit(void *ptr, float *data_ptr, float *weight_ptr, bool *target_ptr, unsigned int nEvents, unsigned int nFeatures);
+    void Fit(void *ptr, float *data_ptr, FastBDT::Weight *weight_ptr, bool *target_ptr, unsigned int nEvents, unsigned int nFeatures);
 
     void Load(void* ptr, char *weightfile);
 
