@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+using namespace FastBDT;
+
 class CInterfaceTest : public ::testing::Test {
 protected:
   virtual void SetUp()
@@ -187,18 +189,18 @@ TEST_F(CInterfaceTest, TrainAndAnalyseForestWorksWithWeights)
   SetNumberOfFlatnessFeatures(expertise, 0);
 
   float data_ptr[] = {1.0, 2.6, 1.6, 2.5, 1.1, 2.0, 1.9, 2.1, 1.6, 2.9, 1.9, 2.9, 1.5, 2.0};
-  float weight_ptr[] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+  Weight weight_ptr[] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
   bool target_ptr[] = {0, 1, 0, 1, 1, 1, 0};
   Fit(expertise, data_ptr, weight_ptr, target_ptr, 7, 2);
 
   float test_ptr[] = {1.0, 2.6};
   EXPECT_LE(Predict(expertise, test_ptr), 0.01);
 
-  float weight_ptr2[] = {2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0};
+  Weight weight_ptr2[] = {2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0};
   Fit(expertise, data_ptr, weight_ptr2, target_ptr, 7, 2);
   EXPECT_LE(Predict(expertise, test_ptr), 0.01);
 
-  float weight_ptr3[] = {1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0};
+  Weight weight_ptr3[] = {1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0};
   Fit(expertise, data_ptr, weight_ptr3, target_ptr, 7, 2);
   EXPECT_LE(Predict(expertise, test_ptr), 0.03);
 }

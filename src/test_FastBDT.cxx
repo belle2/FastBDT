@@ -452,7 +452,7 @@ protected:
   }
 
   std::vector<unsigned int> binned_data;
-  std::vector<float> weights;
+  std::vector<Weight> weights;
   std::vector<bool> isSignal;
 
 };
