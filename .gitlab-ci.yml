@@ -2,31 +2,14 @@ stages:
   - build
   - test
 
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'push' && $CI_COMMIT_BRANCH == 'master'
+
 variables:
   DEBIAN_FRONTEND: "noninteractive"
   UPGRADE_PIP: "false"
-
-.image_list: &image_list
-  - "gcc:12"
-  - "gcc:13"
-  - "gcc:14"
-  - "gcc:15"
-  - "silkeh/clang:17"
-  - "silkeh/clang:18"
-  - "silkeh/clang:19"
-  - "silkeh/clang:20"
-  - "intel/oneapi-basekit:2025.2.0-0-devel-ubuntu24.04"
-
-.build_script: &build_script
-  - |
-    if [[ "$UPGRADE_PIP" != "false" ]]; then
-      pip install --upgrade pip setuptools wheel
-    fi
-  - mkdir -p build install && cd build
-  - cmake .. -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install
-  - make -j$(nproc)
-  - make -j$(nproc) install
-  - python3 -c "import PyFastBDT;print('PyFastBDT version:', PyFastBDT.__version__)"
 
 default:
   interruptible: true
@@ -58,10 +41,56 @@ default:
       git clone --branch release-1.12.0 --depth 1 https://github.com/google/googletest.git /tmp/googletest
       mkdir -p /tmp/googletest/build && cd /tmp/googletest/build
       cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr && make -j$(nproc) install
+    # Create a unique identifier for the venv and install directories
+    - |
+      SAFE_IMAGE=$(echo "${IMAGE}" | tr ':/' '-')
+      if [ "${UPGRADE_PIP}" = "true" ]; then
+        SAFE_IMAGE="${SAFE_IMAGE}_upgraded_pip"
+      fi
+      echo "Unique identifier for the venv and install directories: ${SAFE_IMAGE}"
     - cd ${CI_PROJECT_DIR}
-    - python3 -m venv venv && source venv/bin/activate
   after_script:
     - echo "Successfully completed job \"${CI_JOB_NAME}\" with the image \"${CI_JOB_IMAGE}\""
+
+.image_list: &image_list
+  - "gcc:12"
+  - "gcc:13"
+  - "gcc:14"
+  - "gcc:15"
+  - "silkeh/clang:17"
+  - "silkeh/clang:18"
+  - "silkeh/clang:19"
+  - "silkeh/clang:20"
+  - "intel/oneapi-basekit:2025.2.0-0-devel-ubuntu24.04"
+
+.build_script: &build_script
+  - python3 -m venv venv/${SAFE_IMAGE} && source venv/${SAFE_IMAGE}/bin/activate
+  - |
+    if [[ "$UPGRADE_PIP" != "false" ]]; then
+      pip install --upgrade pip setuptools wheel
+    fi
+  - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE} && cd build/${SAFE_IMAGE}
+  - |
+    cmake ${CI_PROJECT_DIR} \
+      -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install/${SAFE_IMAGE}
+  - make -j$(nproc)
+  - make -j$(nproc) install
+  - python3 -c "import PyFastBDT;print('PyFastBDT version:', PyFastBDT.__version__)"
+
+.test_script: &test_script
+  - source venv/${SAFE_IMAGE}/bin/activate
+  # Run the unit tests
+  - ./install/${SAFE_IMAGE}/bin/fastbdt-unittests
+  # Run all the main examples
+  - cd ${CI_PROJECT_DIR}/examples
+  - |
+    ${CXX} IRISExample.cxx -o IRISExample -O3 \
+      -l FastBDT_static \
+      -L ${CI_PROJECT_DIR}/install/${SAFE_IMAGE}/lib \
+      -I ${CI_PROJECT_DIR}/install/${SAFE_IMAGE}/include
+    ./IRISExample iris.csv
+  - python3 iris_example.py iris.csv
+  - python3 generic_example.py
 
 build:
   stage: build
@@ -89,21 +118,11 @@ build-with-upgraded-pip:
 
 test:
   stage: test
-  needs: [build]
+  needs:
+    - job: build
+      artifacts: true
   image: $IMAGE
   parallel:
     matrix:
       - IMAGE: *image_list
-  script:
-    # Run the unit tests
-    - ./install/bin/fastbdt-unittests
-    # Run all the main examples
-    - cd ${CI_PROJECT_DIR}/examples
-    - |
-      ${CXX} IRISExample.cxx -o IRISExample -O3 \
-      -l FastBDT_static \
-      -L ${CI_PROJECT_DIR}/install/lib \
-      -I ${CI_PROJECT_DIR}/install/include
-      ./IRISExample iris.csv
-    - python3 iris_example.py iris.csv
-    - python3 generic_example.py
+  script: *test_script
