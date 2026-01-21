@@ -10,6 +10,7 @@ workflow:
 variables:
   DEBIAN_FRONTEND: "noninteractive"
   UPGRADE_PIP: "false"
+  CMAKE_USE_DOUBLE_WEIGHT: "OFF"
 
 default:
   interruptible: true
@@ -44,7 +45,9 @@ default:
     # Create a unique identifier for the venv and install directories
     - |
       SAFE_IMAGE=$(echo "${IMAGE}" | tr ':/' '-')
-      if [ "${UPGRADE_PIP}" = "true" ]; then
+      if [ "${CMAKE_USE_DOUBLE_WEIGHT}" = "ON" ]; then
+        SAFE_IMAGE="${SAFE_IMAGE}_double_weight"
+      elif [ "${UPGRADE_PIP}" = "true" ]; then
         SAFE_IMAGE="${SAFE_IMAGE}_upgraded_pip"
       fi
       echo "Unique identifier for the venv and install directories: ${SAFE_IMAGE}"
@@ -72,13 +75,15 @@ default:
   - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE} && cd build/${SAFE_IMAGE}
   - |
     cmake ${CI_PROJECT_DIR} \
-      -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install/${SAFE_IMAGE}
+      -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install/${SAFE_IMAGE} \
+      -DUSE_DOUBLE_WEIGHT=${CMAKE_USE_DOUBLE_WEIGHT}
   - make -j$(nproc)
   - make -j$(nproc) install
   - python3 -c "import PyFastBDT;print('PyFastBDT version:', PyFastBDT.__version__)"
 
 .test_script: &test_script
   - source venv/${SAFE_IMAGE}/bin/activate
+  - python3 -c "import PyFastBDT.FastBDT as FastBDT;print('PyFastBDT uses float for weights:', FastBDT._is_weight_float)"
   # Run the unit tests
   - ./install/${SAFE_IMAGE}/bin/fastbdt-unittests
   # Run all the main examples
@@ -116,6 +121,23 @@ build-with-upgraded-pip:
     UPGRADE_PIP: "true"
   script: *build_script
 
+
+build-with-double-weight:
+  stage: build
+  image: ${IMAGE}
+  parallel:
+    matrix:
+      # One image is enough. The first one in the list above is selected.
+      - IMAGE: "gcc:12"
+  variables:
+    CMAKE_USE_DOUBLE_WEIGHT: "ON"
+  script: *build_script
+  artifacts:
+    paths:
+      - install/
+      - venv/
+    expire_in: 30 minutes
+
 test:
   stage: test
   needs:
@@ -125,4 +147,18 @@ test:
   parallel:
     matrix:
       - IMAGE: *image_list
+  script: *test_script
+
+test-with-double-weight:
+  stage: test
+  needs:
+    - job: build-with-double-weight
+      artifacts: true
+  image: $IMAGE
+  parallel:
+    matrix:
+      # One image is enough. The first one in the list above is selected.
+      - IMAGE: "gcc:12"
+  variables:
+    CMAKE_USE_DOUBLE_WEIGHT: "ON"
   script: *test_script
