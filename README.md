@@ -52,6 +52,29 @@ Typically, you will want to use FastBDT as a library integrated directly into yo
 
 ---
 
+### Weight type and numerical precision
+
+By default, FastBDT uses **single-precision floating point** (`float`) as type for internal weights in the C++ implementation. This choice is made for performance reasons and is sufficient for most use cases.
+If higher numerical precision is required, FastBDT can be compiled using **double-precision floating point** (`double`) weights by enabling the following CMake option at configuration time:
+
+```bash
+cmake .. -DUSE_DOUBLE_WEIGHT=ON
+```
+
+This changes the internal weight type used throughout the FastBDT codebase.
+
+#### Weight type in C++
+
+When working with FastBDT in C++, it is strongly recommended to use the type alias `FastBDT::Weight`, which is available via the header `FastBDT.h`, for all weight-related variables, rather than explicitly using `float` or `double`.
+This ensures that user code remains compatible regardless of whether FastBDT is built with single or double precision.
+
+#### Weight type in Python
+
+The Python interface automatically handles the internal weight type and requires no user action.
+Switching between single and double precision is entirely transparent to Python users.
+
+---
+
 ### Further reading
 
 This work is mostly based on the papers by Jerome H. Friedman

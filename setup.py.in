@@ -3,10 +3,10 @@ from setuptools import setup, find_packages
 setup(
     name='PyFastBDT',
     version='@FastBDT_VERSION_MAJOR@.@FastBDT_VERSION_MINOR@',
-    author='Thomas Keck',
-    author_email='thomas.keck@cern.ch',
-    description='Python bindings for FastBDT, a gradient-boosted decision trees library',
-    url='https://github.com/thomaskeck/FastBDT',
+    author='Thomas Keck, The Belle II Collaboration',
+    author_email='software@belle2.org',
+    description='Stochastic gradient-boosted decision trees for multivariate classification.',
+    url='https://github.com/belle2/FastBDT',
     packages=find_packages(),
     include_package_data=True,
     package_data={

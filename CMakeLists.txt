@@ -1,12 +1,24 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(FastBDT)
+
+include(CTest)
+
 set(FastBDT_VERSION_MAJOR 5)
-set(FastBDT_VERSION_MINOR 3)
+set(FastBDT_VERSION_MINOR 4)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11 -Wall -Wextra -g -msse2")
+
+option(USE_DOUBLE_WEIGHT "Use double precision (double) for Weight instead of single precision (float)" OFF)
+if(USE_DOUBLE_WEIGHT)
+  message(STATUS "FastBDT: using double as type for Weight")
+  set(FastBDT_TYPE_WEIGHT "double")
+else()
+  message(STATUS "FastBDT: using float as type for Weight")
+  set(FastBDT_TYPE_WEIGHT "float")
+endif()
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/include/FastBDT.h.in"
@@ -61,21 +73,24 @@ install(TARGETS FastBDT_static FastBDT_shared FastBDT_CInterface
 
 install(FILES ${FastBDT_HEADERS} DESTINATION include)
 
-find_package(GTest)
-if(GTEST_FOUND)
-  add_executable(fastbdt-unittests ${FastBDT_TESTS} ${FastBDT_HEADERS} ${FastBDT_CINTERFACE})
-  target_link_libraries(fastbdt-unittests ${GTEST_BOTH_LIBRARIES} FastBDT_static pthread)
-  message(STATUS  ${GTEST_INCLUDE_DIRS})
-  target_include_directories(fastbdt-unittests PUBLIC ${GTEST_INCLUDE_DIRS})
+if(BUILD_TESTING)
+  find_package(GTest)
+  if(GTEST_FOUND)
+    add_executable(fastbdt-unittests ${FastBDT_TESTS} ${FastBDT_HEADERS} ${FastBDT_CINTERFACE})
+    target_link_libraries(fastbdt-unittests ${GTEST_BOTH_LIBRARIES} FastBDT_static pthread)
+    message(STATUS  ${GTEST_INCLUDE_DIRS})
+    target_include_directories(fastbdt-unittests PUBLIC ${GTEST_INCLUDE_DIRS})
 
-  install(TARGETS fastbdt-unittests DESTINATION bin)
+    install(TARGETS fastbdt-unittests DESTINATION bin)
+  else()
+    message(STATUS "FastBDT: could not find GoogleTest installation, skip building unit tests.")
+  endif()
 else()
-  message(STATUS "Could not find gtest installation, skip building unittests.")
+  message(STATUS "FastBDT: BUILD_TESTING=OFF, skip building unit tests.")
 endif()
 
 find_program(PYTHON "python3")
 if(PYTHON)
-  # Configure files
   configure_file(
     "${PROJECT_SOURCE_DIR}/setup.py.in"
     "${PROJECT_BINARY_DIR}/setup.py"
@@ -106,7 +121,7 @@ if(PYTHON)
     )
   ")
 else()
-  message(STATUS "Could not find python3, skipping installation of python bindings.")
+  message(STATUS "FastBDT: could not find python3 executable, skip installation of Python bindings.")
 endif()
 
 set(CPACK_PACKAGE_VERSION "${FastBDT_VERSION_MAJOR}.${FastBDT_VERSION_MINOR}")

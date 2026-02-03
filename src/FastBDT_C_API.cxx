@@ -4,9 +4,10 @@
 
 #include "FastBDT_C_API.h"
 
+#include <iostream>
 #include <fstream>
 #include <new>
-#include <iostream>
+#include <type_traits>
 
 using namespace FastBDT;
 
@@ -15,6 +16,11 @@ extern "C" {
   void PrintVersion()
   {
     std::cerr << "FastBDT Version: " << FastBDT_VERSION_MAJOR << "." << FastBDT_VERSION_MINOR << std::endl;
+  }
+
+  bool IsWeightFloat()
+  {
+    return std::is_same<Weight, float>::value;
   }
 
   void* Create()
@@ -119,15 +125,15 @@ extern "C" {
     delete reinterpret_cast<Expertise*>(ptr);
   }
 
-  void Fit(void* ptr, float* data_ptr, float* weight_ptr, bool* target_ptr, unsigned int nEvents, unsigned int nFeatures)
+  void Fit(void* ptr, float* data_ptr, Weight* weight_ptr, bool* target_ptr, unsigned int nEvents, unsigned int nFeatures)
   {
     Expertise* expertise = reinterpret_cast<Expertise*>(ptr);
 
-    std::vector<float> w;
+    std::vector<Weight> w;
     if (weight_ptr != nullptr)
-      w = std::vector<float>(weight_ptr, weight_ptr + nEvents);
+      w = std::vector<Weight>(weight_ptr, weight_ptr + nEvents);
     else
-      w = std::vector<float>(nEvents, 1.0);
+      w = std::vector<Weight>(nEvents, 1.0);
 
     std::vector<bool> y(target_ptr, target_ptr + nEvents);
     std::vector<std::vector<float>> X(nFeatures);
