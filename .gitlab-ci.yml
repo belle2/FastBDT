@@ -71,7 +71,7 @@ default:
 .build_script: &build_script
   - python3 -m venv venv/${SAFE_IMAGE} && source venv/${SAFE_IMAGE}/bin/activate
   - |
-    if [[ "$UPGRADE_PIP" != "false" ]]; then
+    if [[ "$UPGRADE_PIP" == "true" ]]; then
       pip install --upgrade pip setuptools wheel
     fi
   - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE} && cd build/${SAFE_IMAGE}
@@ -105,34 +105,12 @@ build:
   parallel:
     matrix:
       - IMAGE: *image_list
-  script: *build_script
-  artifacts:
-    paths:
-      - install/
-      - venv/
-    expire_in: 30 minutes
-
-build-with-upgraded-pip:
-  stage: build
-  image: ${IMAGE}
-  parallel:
-    matrix:
       # One image is enough. The newest gcc image is selected.
       - IMAGE: "gcc:15"
-  variables:
-    UPGRADE_PIP: "true"
-  script: *build_script
-
-
-build-with-double-weight:
-  stage: build
-  image: ${IMAGE}
-  parallel:
-    matrix:
+        CMAKE_USE_DOUBLE_WEIGHT: "ON"
       # One image is enough. The newest gcc image is selected.
       - IMAGE: "gcc:15"
-  variables:
-    CMAKE_USE_DOUBLE_WEIGHT: "ON"
+        UPGRADE_PIP: "true"
   script: *build_script
   artifacts:
     paths:
@@ -149,18 +127,7 @@ test:
   parallel:
     matrix:
       - IMAGE: *image_list
-  script: *test_script
-
-test-with-double-weight:
-  stage: test
-  needs:
-    - job: build-with-double-weight
-      artifacts: true
-  image: $IMAGE
-  parallel:
-    matrix:
       # One image is enough. The newest gcc image is selected.
       - IMAGE: "gcc:15"
-  variables:
-    CMAKE_USE_DOUBLE_WEIGHT: "ON"
+        CMAKE_USE_DOUBLE_WEIGHT: "ON"
   script: *test_script
