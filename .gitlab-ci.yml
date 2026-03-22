@@ -7,6 +7,19 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_PIPELINE_SOURCE == 'push' && $CI_COMMIT_BRANCH == 'master'
 
+.image_list: &image_list
+  # Compiler versions: N-5, N-3, N-1, N
+  - "gcc:10"
+  - "gcc:12"
+  - "gcc:14"
+  - "gcc:15"
+  - "silkeh/clang:16"
+  - "silkeh/clang:18"
+  - "silkeh/clang:20"
+  - "silkeh/clang:21"
+  # Latest available Intel compiler
+  - "intel/oneapi-basekit:2025.3.1-0-devel-ubuntu24.04"
+
 variables:
   DEBIAN_FRONTEND: "noninteractive"
   UPGRADE_PIP: "false"
@@ -53,25 +66,18 @@ default:
       echo "Unique identifier for the venv and install directories: ${SAFE_IMAGE}"
     - cd ${CI_PROJECT_DIR}
   after_script:
-    - echo "Successfully completed job \"${CI_JOB_NAME}\" with the image \"${CI_JOB_IMAGE}\""
-
-.image_list: &image_list
-  # Compiler versions: N-5, N-3, N-1, N
-  - "gcc:10"
-  - "gcc:12"
-  - "gcc:14"
-  - "gcc:15"
-  - "silkeh/clang:16"
-  - "silkeh/clang:18"
-  - "silkeh/clang:20"
-  - "silkeh/clang:21"
-  # Latest available Intel compiler
-  - "intel/oneapi-basekit:2025.3.1-0-devel-ubuntu24.04"
+    - |
+      echo "Job summary:"
+      echo "  Job:                     ${CI_JOB_NAME}"
+      echo "  Image:                   ${CI_JOB_IMAGE}"
+      echo "  Status:                  ${CI_JOB_STATUS}"
+      echo "  CMAKE_USE_DOUBLE_WEIGHT: ${CMAKE_USE_DOUBLE_WEIGHT}"
+      echo "  UPGRADE_PIP:             ${UPGRADE_PIP}"
 
 .build_script: &build_script
   - python3 -m venv venv/${SAFE_IMAGE} && source venv/${SAFE_IMAGE}/bin/activate
   - |
-    if [[ "$UPGRADE_PIP" != "false" ]]; then
+    if [[ "$UPGRADE_PIP" == "true" ]]; then
       pip install --upgrade pip setuptools wheel
     fi
   - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE} && cd build/${SAFE_IMAGE}
@@ -105,34 +111,12 @@ build:
   parallel:
     matrix:
       - IMAGE: *image_list
-  script: *build_script
-  artifacts:
-    paths:
-      - install/
-      - venv/
-    expire_in: 30 minutes
-
-build-with-upgraded-pip:
-  stage: build
-  image: ${IMAGE}
-  parallel:
-    matrix:
       # One image is enough. The newest gcc image is selected.
       - IMAGE: "gcc:15"
-  variables:
-    UPGRADE_PIP: "true"
-  script: *build_script
-
-
-build-with-double-weight:
-  stage: build
-  image: ${IMAGE}
-  parallel:
-    matrix:
+        CMAKE_USE_DOUBLE_WEIGHT: "ON"
       # One image is enough. The newest gcc image is selected.
       - IMAGE: "gcc:15"
-  variables:
-    CMAKE_USE_DOUBLE_WEIGHT: "ON"
+        UPGRADE_PIP: "true"
   script: *build_script
   artifacts:
     paths:
@@ -149,18 +133,7 @@ test:
   parallel:
     matrix:
       - IMAGE: *image_list
-  script: *test_script
-
-test-with-double-weight:
-  stage: test
-  needs:
-    - job: build-with-double-weight
-      artifacts: true
-  image: $IMAGE
-  parallel:
-    matrix:
       # One image is enough. The newest gcc image is selected.
       - IMAGE: "gcc:15"
-  variables:
-    CMAKE_USE_DOUBLE_WEIGHT: "ON"
+        CMAKE_USE_DOUBLE_WEIGHT: "ON"
   script: *test_script
