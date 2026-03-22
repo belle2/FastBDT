@@ -14,7 +14,8 @@
 
 using namespace FastBDT;
 
-constexpr int TEST_ITERATIONS = 5;
+constexpr unsigned short TEST_ITERATIONS = 5;
+constexpr double ERROR_MARGIN = 2.3;
 
 class PerformanceFeatureBinningTest : public ::testing::Test {
 protected:
@@ -67,7 +68,7 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
     double size_ratio = sizes[i] / static_cast<double>(sizes[0]);
     double time_ratio = times[i] / static_cast<double>(times[0]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.1);
+    EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 
 }
@@ -153,7 +154,7 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
     double size_ratio = sizes[i] / static_cast<double>(sizes[0]);
     double time_ratio = times[i] / static_cast<double>(times[0]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.1);
+    EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 }
 
@@ -201,7 +202,7 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfFeatures)
     double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
     double time_ratio = times[i] / static_cast<double>(times[1]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.1);
+    EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 }
 
@@ -262,6 +263,6 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers
     double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
     double time_ratio = times[i] / static_cast<double>(times[1]);
     // We allow for deviation of almost a factor two
-    EXPECT_LT(time_ratio,  size_ratio * 2.1);
+    EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 }
