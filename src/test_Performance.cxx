@@ -14,14 +14,16 @@
 
 using namespace FastBDT;
 
-constexpr unsigned short TEST_ITERATIONS = 8;
-constexpr double ERROR_MARGIN = 2.1;
+// Number of iterations of the performance tests
+constexpr unsigned short TEST_ITERATIONS = 5;
+// Allow 2× for O(N log N) sort vs O(N) assumption, plus 10% for timer jitter
+constexpr double ERROR_MARGIN = 2.0;
 
 class PerformanceFeatureBinningTest : public ::testing::Test {
 protected:
   virtual void SetUp()
   {
-    std::default_random_engine generator;
+    std::default_random_engine generator(42);
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
     unsigned int N = 10000000;
     data.resize(N);
@@ -34,11 +36,9 @@ protected:
 
 TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPoints)
 {
-
   // This is dominated by the sorting of the numbers -> N log (N),
   // for our purposes we assume just N, which seems to be fine
   // if this unittest starts failing I have to revise this and add the factor of log(N)
-
   std::vector<unsigned int> sizes = {1000, 10000, 100000, 1000000};
   std::vector<double> times;
 
@@ -64,10 +64,11 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
   }
 
   // Check linear behaviour
+  // We ignore the first measurement, to avoid effects of caching
   for (unsigned int i = 1; i < sizes.size(); ++i) {
-    double size_ratio = sizes[i] / static_cast<double>(sizes[0]);
-    double time_ratio = times[i] / static_cast<double>(times[0]);
-    // We allow for deviation of almost a factor two
+    double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
+    double time_ratio = times[i] / static_cast<double>(times[1]);
+    std::cout << "Ratio time/size: " << time_ratio / size_ratio << std::endl;
     EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 
@@ -75,7 +76,6 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesLinearInNumberOfDataPo
 
 TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesConstantInSmallNumberOfLayers)
 {
-
   // The feature binning should be dominated by the sorting of the numbers
   // hence it does not scale with the number of layers to first order
   // for large layers this will be wrong ~ #Layer > 17
@@ -83,20 +83,28 @@ TEST_F(PerformanceFeatureBinningTest, FeatureBinningScalesConstantInSmallNumberO
   std::vector<double> times;
 
   for (auto& size : sizes) {
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-    FeatureBinning<float> binning(size, data);
-    std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
 
-    // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
-    EXPECT_EQ(binning.GetNLevels(), size);
+    // Repeat the test few times and calculate the average time
+    double temp_time = 0.0;
+    for (unsigned short i = 0; i < TEST_ITERATIONS; ++i) {
 
-    std::chrono::duration<double, std::micro> time = stop - start;
-    times.push_back(time.count());
+      std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+      FeatureBinning<float> binning(size, data);
+      std::chrono::high_resolution_clock::time_point stop = std::chrono::high_resolution_clock::now();
+
+      // We check something simple, so that we are sure that the compiler cannot optimize out the binning itself
+      EXPECT_EQ(binning.GetNLevels(), size);
+
+      std::chrono::duration<double, std::micro> time = stop - start;
+      temp_time += time.count();
+    }
+
+    times.push_back(temp_time / TEST_ITERATIONS);
   }
 
   // Check linear behaviour
-  // We ignore the first measurement, to avoids effects of caching
-  for (unsigned int i = 2; i < sizes.size(); ++i) {
+  // We ignore the first measurement, to avoid effects of caching
+  for (unsigned int i = 1; i < sizes.size(); ++i) {
     double time_ratio = times[i] / static_cast<double>(times[1]);
     EXPECT_GT(time_ratio,  0.8);
     EXPECT_LT(time_ratio,  1.2);
@@ -150,10 +158,11 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfDataPoints)
   }
 
   // Check linear behaviour
+  // We ignore the first measurement, to avoid effects of caching
   for (unsigned int i = 1; i < sizes.size(); ++i) {
-    double size_ratio = sizes[i] / static_cast<double>(sizes[0]);
-    double time_ratio = times[i] / static_cast<double>(times[0]);
-    // We allow for deviation of almost a factor two
+    double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
+    double time_ratio = times[i] / static_cast<double>(times[1]);
+    std::cout << "Ratio time/size: " << time_ratio / size_ratio << std::endl;
     EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 }
@@ -198,17 +207,17 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearInNumberOfFeatures)
   }
 
   // Check linear behaviour
+  // We ignore the first measurement, to avoid effects of caching
   for (unsigned int i = 1; i < sizes.size(); ++i) {
     double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
     double time_ratio = times[i] / static_cast<double>(times[1]);
-    // We allow for deviation of almost a factor two
+    std::cout << "Ratio time/size: " << time_ratio / size_ratio << std::endl;
     EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 }
 
 TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers)
 {
-
   // For small numbers of layers (below 10) we should scale linear,
   // above the number of nodes in the deeper layers of the tree gets in the same order
   // of magnitude as the number of data_points and the summing of the histograms
@@ -259,10 +268,11 @@ TEST_F(PerformanceTreeBuilderTest, TreeBuilderScalesLinearForSmallNumberOfLayers
   }
 
   // Check linear behaviour
+  // We ignore the first measurement, to avoid effects of caching
   for (unsigned int i = 1; i < sizes.size(); ++i) {
     double size_ratio = sizes[i] / static_cast<double>(sizes[1]);
     double time_ratio = times[i] / static_cast<double>(times[1]);
-    // We allow for deviation of almost a factor two
+    std::cout << "Ratio time/size: " << time_ratio / size_ratio << std::endl;
     EXPECT_LT(time_ratio,  size_ratio * ERROR_MARGIN);
   }
 }
