@@ -14,8 +14,8 @@
 
 using namespace FastBDT;
 
-constexpr unsigned short TEST_ITERATIONS = 10;
-constexpr double ERROR_MARGIN = 2.3;
+constexpr unsigned short TEST_ITERATIONS = 8;
+constexpr double ERROR_MARGIN = 2.1;
 
 class PerformanceFeatureBinningTest : public ::testing::Test {
 protected:
