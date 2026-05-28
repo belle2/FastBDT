@@ -2,8 +2,8 @@ name: CI (macOS)
 
 on:
   push:
-    branches: [master]
-  pull_request:
+    tags:
+      - '*'
 
 jobs:
   build-and-test:
