@@ -8,7 +8,9 @@ c_float_p = ctypes.POINTER(ctypes.c_float)
 c_bool_p = ctypes.POINTER(ctypes.c_bool)
 c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
-FastBDT_library = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libFastBDT_CInterface.so'))
+import sys
+_lib_ext = '.dylib' if sys.platform == 'darwin' else '.so'
+FastBDT_library = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libFastBDT_CInterface' + _lib_ext))
 
 FastBDT_library.IsWeightFloat.restype = ctypes.c_bool
 _is_weight_float = FastBDT_library.IsWeightFloat()
