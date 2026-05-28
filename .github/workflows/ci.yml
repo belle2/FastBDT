@@ -1,0 +1,68 @@
+name: CI (macOS)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Build and test on macOS
+    runs-on: macos-latest
+    env:
+      CC: clang
+      CXX: clang++
+      CMAKE_USE_DOUBLE_WEIGHT: "OFF"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install cmake googletest
+
+      - name: Set up Python venv
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install setuptools wheel
+
+      - name: Configure CMake
+        # Venv must be active so cmake caches the venv python3 for the pip install at install time
+        run: |
+          source venv/bin/activate
+          cmake -S . -B build \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+            -DUSE_DOUBLE_WEIGHT=${{ env.CMAKE_USE_DOUBLE_WEIGHT }} \
+            -DCMAKE_PREFIX_PATH=$(brew --prefix) \
+            -DPYTHON=$(which python3)
+
+      - name: Build
+        run: make -C build -j$(sysctl -n hw.ncpu)
+
+      - name: Install and verify Python module
+        run: |
+          source venv/bin/activate
+          make -C build install
+          # Run from /tmp so Python cannot accidentally import from the source tree
+          cd /tmp && python3 -c "import PyFastBDT; print('PyFastBDT version:', PyFastBDT.__version__)"
+
+      - name: Run unit tests
+        run: |
+          export DYLD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$(brew --prefix)/lib
+          ${{ github.workspace }}/install/bin/fastbdt-unittests
+
+      - name: Run C++ example
+        run: |
+          cd examples
+          $CXX IRISExample.cxx -o IRISExample -O3 \
+            -lFastBDT_static \
+            -L ${{ github.workspace }}/install/lib \
+            -I ${{ github.workspace }}/install/include
+          ./IRISExample iris.csv
+
+      - name: Run Python examples
+        run: |
+          source venv/bin/activate
+          cd examples
+          python3 iris_example.py iris.csv
+          python3 generic_example.py
