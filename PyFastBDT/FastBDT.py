@@ -21,7 +21,7 @@ FastBDT_library.Delete.argtypes = [ctypes.c_void_p]
 FastBDT_library.Load.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 FastBDT_library.Save.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
-FastBDT_library.Fit.argtypes = [ctypes.c_void_p, c_float_p, c_float_p if _is_weight_float else c_double_p, c_bool_p, ctypes.c_uint]
+FastBDT_library.Fit.argtypes = [ctypes.c_void_p, c_float_p, c_float_p if _is_weight_float else c_double_p, c_bool_p, ctypes.c_uint, ctypes.c_uint]
 
 FastBDT_library.Predict.argtypes = [ctypes.c_void_p, c_float_p]
 FastBDT_library.Predict.restype = ctypes.c_float
@@ -30,38 +30,38 @@ FastBDT_library.PredictArray.argtypes = [ctypes.c_void_p, c_float_p, c_float_p, 
 
 FastBDT_library.SetSubsample.argtypes = [ctypes.c_void_p, ctypes.c_double]
 FastBDT_library.GetSubsample.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetSubsample.restypes = ctypes.c_double
+FastBDT_library.GetSubsample.restype = ctypes.c_double
 
 FastBDT_library.SetShrinkage.argtypes = [ctypes.c_void_p, ctypes.c_double]
 FastBDT_library.GetShrinkage.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetShrinkage.restypes = ctypes.c_double
+FastBDT_library.GetShrinkage.restype = ctypes.c_double
 
 FastBDT_library.SetFlatnessLoss.argtypes = [ctypes.c_void_p, ctypes.c_double]
 FastBDT_library.GetFlatnessLoss.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetFlatnessLoss.restypes = ctypes.c_double
+FastBDT_library.GetFlatnessLoss.restype = ctypes.c_double
 
 FastBDT_library.SetNTrees.argtypes = [ctypes.c_void_p, ctypes.c_uint]
 FastBDT_library.GetNTrees.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetNTrees.restypes = ctypes.c_uint
+FastBDT_library.GetNTrees.restype = ctypes.c_uint
 
 FastBDT_library.SetNumberOfFlatnessFeatures.argtypes = [ctypes.c_void_p, ctypes.c_uint]
 FastBDT_library.GetNumberOfFlatnessFeatures.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetNumberOfFlatnessFeatures.restypes = ctypes.c_uint
+FastBDT_library.GetNumberOfFlatnessFeatures.restype = ctypes.c_uint
 
 FastBDT_library.SetBinning.argtypes = [ctypes.c_void_p, c_uint_p, ctypes.c_uint]
 FastBDT_library.SetPurityTransformation.argtypes = [ctypes.c_void_p, c_uint_p, ctypes.c_uint]
 
 FastBDT_library.SetDepth.argtypes = [ctypes.c_void_p, ctypes.c_uint]
 FastBDT_library.GetDepth.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetDepth.restypes = ctypes.c_uint
+FastBDT_library.GetDepth.restype = ctypes.c_uint
 
 FastBDT_library.SetTransform2Probability.argtypes = [ctypes.c_void_p, ctypes.c_bool]
 FastBDT_library.GetTransform2Probability.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetTransform2Probability.restypes = ctypes.c_bool
+FastBDT_library.GetTransform2Probability.restype = ctypes.c_bool
 
 FastBDT_library.SetSPlot.argtypes = [ctypes.c_void_p, ctypes.c_bool]
 FastBDT_library.GetSPlot.argtypes = [ctypes.c_void_p]
-FastBDT_library.GetSPlot.restypes = ctypes.c_bool
+FastBDT_library.GetSPlot.restype = ctypes.c_bool
 
 FastBDT_library.GetVariableRanking.argtypes = [ctypes.c_void_p]
 FastBDT_library.GetVariableRanking.restype = ctypes.c_void_p
