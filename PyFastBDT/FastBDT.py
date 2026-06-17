@@ -21,7 +21,13 @@ FastBDT_library.Delete.argtypes = [ctypes.c_void_p]
 FastBDT_library.Load.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 FastBDT_library.Save.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
-FastBDT_library.Fit.argtypes = [ctypes.c_void_p, c_float_p, c_float_p if _is_weight_float else c_double_p, c_bool_p, ctypes.c_uint, ctypes.c_uint]
+FastBDT_library.Fit.argtypes = [
+    ctypes.c_void_p,
+    c_float_p,
+    c_float_p if _is_weight_float else c_double_p,
+    c_bool_p,
+    ctypes.c_uint,
+    ctypes.c_uint]
 
 FastBDT_library.Predict.argtypes = [ctypes.c_void_p, c_float_p]
 FastBDT_library.Predict.restype = ctypes.c_float
