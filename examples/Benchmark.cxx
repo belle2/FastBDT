@@ -108,9 +108,9 @@ static void generateData(unsigned nEvents, unsigned nFeatures, unsigned seed,
 // ---------------------------------------------------------------------------
 
 static FastBDT::Classifier makeClassifier(unsigned nFeatures,
-                                          unsigned nTrees  = 100,
+                                          unsigned nTrees  = 400,
                                           unsigned depth   = 3,
-                                          unsigned nLevels = 8)
+                                          unsigned nLevels = 10)
 {
   FastBDT::Classifier clf;
   clf.SetNTrees(nTrees);
@@ -133,7 +133,7 @@ static FastBDT::Classifier makeClassifier(unsigned nFeatures,
 static void benchmarkTraining(unsigned nRepeat)
 {
   const unsigned nFeatures = 10;
-  printHeader("Training  (nFeatures=10, nTrees=100, depth=3, nLevels=8)");
+  printHeader("Training  (nFeatures=10, nTrees=400, depth=3, nLevels=10)");
 
   const std::vector<unsigned> sizes = {1000, 10000, 100000, 1000000};
 
