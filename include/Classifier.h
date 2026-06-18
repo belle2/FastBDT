@@ -94,6 +94,11 @@ namespace FastBDT {
 
     float predict(const std::vector<float>& X) const;
 
+    // Pointer overload: X must point to at least GetNFeatures() contiguous
+    // floats. Avoids constructing a std::vector per call, which matters for
+    // bulk inference (e.g. PredictArray over millions of events).
+    float predict(const float* X) const;
+
     std::map<unsigned int, double> GetVariableRanking() const;
 
     std::map<unsigned int, double> GetIndividualVariableRanking(const std::vector<float>& X) const;

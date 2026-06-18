@@ -132,8 +132,15 @@ namespace FastBDT {
 
   float Classifier::predict(const std::vector<float>& X) const
   {
+    return predict(X.data());
+  }
+
+  float Classifier::predict(const float* X) const
+  {
 
     if (m_can_use_fast_forest) {
+      // Forest::Analyse / Tree::ValueToNode are templated on the iterator, so
+      // the raw pointer is used directly without copying into a vector.
       return m_fast_forest.Analyse(X);
     } else {
       std::vector<unsigned int> bins(m_numberOfFinalFeatures);

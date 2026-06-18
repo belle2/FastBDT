@@ -163,15 +163,16 @@ extern "C" {
   float Predict(void* ptr, float* array)
   {
     Expertise* expertise = reinterpret_cast<Expertise*>(ptr);
-    return expertise->classifier.predict(std::vector<float>(array, array + expertise->classifier.GetNFeatures()));
+    return expertise->classifier.predict(array);
   }
 
   void PredictArray(void* ptr, float* array, float* result, unsigned int nEvents)
   {
     Expertise* expertise = reinterpret_cast<Expertise*>(ptr);
     unsigned int nFeatures = expertise->classifier.GetNFeatures();
+    // Use the pointer overload so we do not allocate a std::vector per event.
     for (unsigned int iEvent = 0; iEvent < nEvents; ++iEvent) {
-      result[iEvent] = expertise->classifier.predict(std::vector<float>(array + iEvent * nFeatures, array + (iEvent + 1) * nFeatures));
+      result[iEvent] = expertise->classifier.predict(array + iEvent * nFeatures);
     }
   }
 
