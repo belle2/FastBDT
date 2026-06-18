@@ -9,6 +9,11 @@ c_bool_p = ctypes.POINTER(ctypes.c_bool)
 c_uint_p = ctypes.POINTER(ctypes.c_uint)
 
 import sys
+
+# np.trapezoid was introduced in numpy 2.0 as the new name for np.trapz.
+# Fall back to np.trapz so we also work with numpy < 2.0.
+_trapezoid = getattr(np, 'trapezoid', None) or np.trapz
+
 _lib_ext = '.dylib' if sys.platform == 'darwin' else '.so'
 FastBDT_library = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libFastBDT_CInterface' + _lib_ext))
 
@@ -55,7 +60,8 @@ FastBDT_library.GetNumberOfFlatnessFeatures.argtypes = [ctypes.c_void_p]
 FastBDT_library.GetNumberOfFlatnessFeatures.restype = ctypes.c_uint
 
 FastBDT_library.SetBinning.argtypes = [ctypes.c_void_p, c_uint_p, ctypes.c_uint]
-FastBDT_library.SetPurityTransformation.argtypes = [ctypes.c_void_p, c_uint_p, ctypes.c_uint]
+# Note: the C API takes a bool* here, so the buffer must be 1 byte per element.
+FastBDT_library.SetPurityTransformation.argtypes = [ctypes.c_void_p, c_bool_p, ctypes.c_uint]
 
 FastBDT_library.SetDepth.argtypes = [ctypes.c_void_p, ctypes.c_uint]
 FastBDT_library.GetDepth.argtypes = [ctypes.c_void_p]
@@ -104,7 +110,7 @@ def calculate_roc_auc(p, t, w=None):
     # Exclude the last bin to avoid a division by 0
     purity = (T - cum_t[:-1]) / (N - cum_w[:-1])
     efficiency = (T - cum_t[:-1]) / T
-    return np.abs(np.trapezoid(purity, efficiency))
+    return np.abs(_trapezoid(purity, efficiency))
 
 
 class Classifier(object):
@@ -145,7 +151,14 @@ class Classifier(object):
 
     def create_forest(self):
         forest = FastBDT_library.Create()
-        FastBDT_library.SetBinning(forest, np.array(self.binning).ctypes.data_as(c_uint_p), int(len(self.binning)))
+        # Coerce to the exact C types here. The C API reads binning as
+        # `unsigned int*` (4 bytes each) and purityTransformation as `bool*`
+        # (1 byte each). A plain Python list becomes a numpy int64/bool array,
+        # so without an explicit dtype the raw bytes would be misinterpreted on
+        # the C side (e.g. binning=[5, 5] would be read as [5, 0]).
+        binning = np.ascontiguousarray(self.binning, dtype=np.uint32)
+        purityTransformation = np.ascontiguousarray(self.purityTransformation, dtype=np.bool_)
+        FastBDT_library.SetBinning(forest, binning.ctypes.data_as(c_uint_p), int(len(self.binning)))
         FastBDT_library.SetNTrees(forest, int(self.nTrees))
         FastBDT_library.SetDepth(forest, int(self.depth))
         FastBDT_library.SetNumberOfFlatnessFeatures(forest, int(self.numberOfFlatnessFeatures))
@@ -155,7 +168,7 @@ class Classifier(object):
         FastBDT_library.SetTransform2Probability(forest, bool(self.transform2probability))
         FastBDT_library.SetSPlot(forest, bool(self.sPlot))
         FastBDT_library.SetPurityTransformation(
-            forest, np.array(self.purityTransformation).ctypes.data_as(c_uint_p),
+            forest, purityTransformation.ctypes.data_as(c_bool_p),
             int(len(self.purityTransformation))
         )
         return forest
@@ -184,13 +197,32 @@ class Classifier(object):
         return p
 
     def predict_single(self, row):
-        return FastBDT_library.Predict(self.forest, row.ctypes.data_as(c_float_p))
+        row_temp = np.require(row, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
+        return FastBDT_library.Predict(self.forest, row_temp.ctypes.data_as(c_float_p))
 
     def save(self, weightfile):
         FastBDT_library.Save(self.forest, bytes(weightfile, 'utf-8'))
 
+    def _refresh_parameters_from_forest(self):
+        """
+        Update the Python-side hyperparameter attributes from the underlying
+        C++ classifier. Used after load(), where the C++ model carries the real
+        values but the Python attributes would otherwise keep the constructor
+        defaults. binning and purityTransformation have no C getter and cannot
+        be recovered, but they are not needed for inference.
+        """
+        self.nTrees = FastBDT_library.GetNTrees(self.forest)
+        self.depth = FastBDT_library.GetDepth(self.forest)
+        self.numberOfFlatnessFeatures = FastBDT_library.GetNumberOfFlatnessFeatures(self.forest)
+        self.shrinkage = FastBDT_library.GetShrinkage(self.forest)
+        self.subsample = FastBDT_library.GetSubsample(self.forest)
+        self.flatnessLoss = FastBDT_library.GetFlatnessLoss(self.forest)
+        self.transform2probability = FastBDT_library.GetTransform2Probability(self.forest)
+        self.sPlot = FastBDT_library.GetSPlot(self.forest)
+
     def load(self, weightfile):
         FastBDT_library.Load(self.forest, bytes(weightfile, 'utf-8'))
+        self._refresh_parameters_from_forest()
 
     def individualFeatureImportance(self, X):
         X_temp = np.require(X, dtype=np.float32, requirements=['A', 'W', 'C', 'O'])
