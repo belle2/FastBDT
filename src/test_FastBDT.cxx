@@ -285,6 +285,32 @@ TEST_F(FeatureBinningTest, LowStatisticIsHandledCorrectly)
 
 }
 
+TEST_F(FeatureBinningTest, OneLevelBinningWorks)
+{
+  // nLevels=1 was previously rejected as "< 2 levels" but is fully valid:
+  // one median cut produces 2 meaningful bins (+ 1 NaN bin = 3 total).
+  std::vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f};
+  FeatureBinning<float> fb(1u, data);
+
+  EXPECT_EQ(fb.GetNLevels(), 1u);
+  EXPECT_EQ(fb.GetNBins(), 3u);
+  EXPECT_FLOAT_EQ(fb.GetMin(), 1.0f);
+  EXPECT_FLOAT_EQ(fb.GetMax(), 4.0f);
+
+  EXPECT_EQ(fb.ValueToBin(NAN), 0u);
+  EXPECT_EQ(fb.ValueToBin(0.0f), 1u);   // below min → first bin
+  EXPECT_EQ(fb.ValueToBin(2.0f), 1u);   // below median cut → first bin
+  EXPECT_EQ(fb.ValueToBin(3.0f), 2u);   // at cut → second bin
+  EXPECT_EQ(fb.ValueToBin(5.0f), 2u);   // above max → second bin
+}
+
+TEST_F(FeatureBinningTest, ZeroLevelBinningThrows)
+{
+  // nLevels=0 would cause unsigned underflow in BinToValue and is forbidden.
+  std::vector<float> data = {1.0f, 2.0f};
+  EXPECT_THROW(FeatureBinning<float>(0u, data), std::runtime_error);
+}
+
 class WeightedFeatureBinningTest : public ::testing::Test {
 protected:
   virtual void SetUp()
@@ -367,6 +393,22 @@ TEST_F(WeightedFeatureBinningTest, SameAsUsualBinningWithoutWeights)
 
   EXPECT_EQ(usualBinning.GetBinning(), weightedBinning.GetBinning());
 
+}
+
+TEST_F(WeightedFeatureBinningTest, UnsortedInputGivesSameResultAsSortedInput)
+{
+  // With interleaved values like {1,2,1,2,...} the old distinct-value count
+  // compared consecutive pairs and over-counted, suppressing the equal-frequency
+  // fallback. After the fix the count is done on sorted input, so interleaved
+  // and sorted data with the same values produce identical binnings.
+  std::vector<float>  sorted_data     = {1.0f, 1.0f, 1.0f, 2.0f, 2.0f, 2.0f};
+  std::vector<float>  interleaved_data = {1.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f};
+  std::vector<Weight> weights(6, 1.0f);
+
+  WeightedFeatureBinning<float> fb_sorted(2, sorted_data, weights);
+  WeightedFeatureBinning<float> fb_interleaved(2, interleaved_data, weights);
+
+  EXPECT_EQ(fb_sorted.GetBinning(), fb_interleaved.GetBinning());
 }
 
 class EquidistantFeatureBinningTest : public ::testing::Test {
@@ -738,6 +780,22 @@ TEST_F(EventSampleTest, AddingEventsWithNANWeightsThrow)
 
   eventSample->AddEvent(std::vector<unsigned int>({2, 3, 5, 1}), 1.0, true);
   EXPECT_THROW(eventSample->AddEvent(std::vector<unsigned int>({2, 3, 5, 1}), NAN, true), std::runtime_error);
+
+}
+
+TEST_F(EventSampleTest, AddingEventsWithOutOfRangeBinThrows)
+{
+
+  // The fixture uses binning levels {8, 8, 8, 4}, so the number of bins per
+  // feature is {257, 257, 257, 17}. Valid bin indices are 0 .. nBins-1, i.e.
+  // the largest valid index for the last feature is 16.
+  //
+  // A bin index equal to nBins (here 17) is one past the last valid bin. If it
+  // were accepted it would cause an out-of-bounds write while filling the
+  // cumulative distributions, so AddEvent must reject it.
+  EXPECT_NO_THROW(eventSample->AddEvent(std::vector<unsigned int>({256, 256, 256, 16}), 1.0, true));  // max valid bins
+  EXPECT_THROW(eventSample->AddEvent(std::vector<unsigned int>({1, 2, 3, 17}), 1.0, true), std::runtime_error);   // == nBins
+  EXPECT_THROW(eventSample->AddEvent(std::vector<unsigned int>({257, 2, 3, 1}), 1.0, true), std::runtime_error);  // == nBins
 
 }
 
@@ -1905,4 +1963,81 @@ TEST_F(RewriteTest, CheckSameResultForOriginalAndRewrittenFloatForest)
     EXPECT_FLOAT_EQ(forest->GetF(std::vector<unsigned int>({featureBinning->ValueToBin(x)})), rewritten_forest.GetF(std::vector<float>({x})));
   }
 
+}
+
+// EquidistantFeatureBinning: ValueToBin, BinToValue, round-trip, constant feature
+
+TEST_F(EquidistantFeatureBinningTest, ValueToBinMapsCorrectly)
+{
+  // Fixture data gives min=0.0, max=16.0 with nLevels=2.
+  // Equidistant boundaries: 4.0, 8.0, 12.0  =>  4 bins [<4) [4,8) [8,12) [>=12].
+  EXPECT_EQ(calculatedBinning->ValueToBin(-1.0f),  1u);  // underflow -> first bin
+  EXPECT_EQ(calculatedBinning->ValueToBin(0.0f),   1u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(3.9f),   1u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(4.0f),   2u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(7.9f),   2u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(8.0f),   3u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(11.9f),  3u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(12.0f),  4u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(16.0f),  4u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(100.0f), 4u);  // overflow -> last bin
+  EXPECT_EQ(calculatedBinning->ValueToBin(NAN),    0u);  // NaN -> bin 0
+}
+
+TEST_F(EquidistantFeatureBinningTest, BinToValueMapsCorrectly)
+{
+  EXPECT_TRUE(std::isnan(calculatedBinning->BinToValue(0u)));
+  EXPECT_EQ(calculatedBinning->BinToValue(1u), -std::numeric_limits<float>::infinity());
+  EXPECT_EQ(calculatedBinning->BinToValue(2u), 4.0f);
+  EXPECT_EQ(calculatedBinning->BinToValue(3u), 8.0f);
+  EXPECT_EQ(calculatedBinning->BinToValue(4u), 12.0f);
+}
+
+TEST_F(EquidistantFeatureBinningTest, BinRoundTrip)
+{
+  std::vector<float> values = {-1.0f, 0.0f, 3.9f, 4.0f, 7.9f, 8.0f, 11.9f, 12.0f, 16.0f, 100.0f};
+  for (auto& x : values) {
+    unsigned int bin = calculatedBinning->ValueToBin(x);
+    EXPECT_EQ(bin, calculatedBinning->ValueToBin(calculatedBinning->BinToValue(bin)));
+  }
+}
+
+TEST_F(EquidistantFeatureBinningTest, ConstantFeatureIsHandledCorrectly)
+{
+  std::vector<float> data(12, 5.0f);
+  EquidistantFeatureBinning<float> fb(2, data);
+  EXPECT_EQ(fb.GetNBins(), 5u);
+  EXPECT_FLOAT_EQ(fb.GetMin(), 5.0f);
+  EXPECT_FLOAT_EQ(fb.GetMax(), 5.0f);
+  EXPECT_EQ(fb.ValueToBin(NAN), 0u);
+  EXPECT_EQ(fb.ValueToBin(5.0f),  fb.GetNBins() - 1u);  // at constant -> last bin
+  EXPECT_EQ(fb.ValueToBin(100.0f), fb.GetNBins() - 1u); // above constant -> last bin
+  EXPECT_EQ(fb.ValueToBin(4.9f),  1u);                  // below constant -> first bin
+}
+
+// WeightedFeatureBinning: ValueToBin and BinToValue
+
+TEST_F(WeightedFeatureBinningTest, ValueToBinMapsCorrectly)
+{
+  // Fixture weighted binning gives cuts at 5.0 (left), 6.0 (root), 10.0 (right).
+  EXPECT_EQ(calculatedBinning->ValueToBin(1.0f),   1u);  // < 5.0 -> bin 1
+  EXPECT_EQ(calculatedBinning->ValueToBin(4.9f),   1u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(5.0f),   2u);  // [5.0, 6.0) -> bin 2
+  EXPECT_EQ(calculatedBinning->ValueToBin(5.9f),   2u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(6.0f),   3u);  // [6.0, 10.0) -> bin 3
+  EXPECT_EQ(calculatedBinning->ValueToBin(9.9f),   3u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(10.0f),  4u);  // >= 10.0 -> bin 4
+  EXPECT_EQ(calculatedBinning->ValueToBin(12.0f),  4u);
+  EXPECT_EQ(calculatedBinning->ValueToBin(-1.0f),  1u);  // underflow -> first bin
+  EXPECT_EQ(calculatedBinning->ValueToBin(100.0f), 4u);  // overflow -> last bin
+  EXPECT_EQ(calculatedBinning->ValueToBin(NAN),    0u);  // NaN -> bin 0
+}
+
+TEST_F(WeightedFeatureBinningTest, BinToValueMapsCorrectly)
+{
+  EXPECT_TRUE(std::isnan(calculatedBinning->BinToValue(0u)));
+  EXPECT_EQ(calculatedBinning->BinToValue(1u), -std::numeric_limits<float>::infinity());
+  EXPECT_EQ(calculatedBinning->BinToValue(2u), 5.0f);
+  EXPECT_EQ(calculatedBinning->BinToValue(3u), 6.0f);
+  EXPECT_EQ(calculatedBinning->BinToValue(4u), 10.0f);
 }
