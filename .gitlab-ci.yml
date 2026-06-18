@@ -94,6 +94,7 @@ default:
   - python3 -c "import PyFastBDT.FastBDT as FastBDT;print('PyFastBDT uses float for weights:', FastBDT._is_weight_float)"
   # Run the unit tests
   - ./install/${SAFE_IMAGE}/bin/fastbdt-unittests
+  - python3 -m pytest tests/test_python_interface.py
   # Run all the main examples
   - cd ${CI_PROJECT_DIR}/examples
   - |
