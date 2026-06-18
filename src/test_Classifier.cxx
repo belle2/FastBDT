@@ -203,3 +203,46 @@ TEST_F(ClassifierTest, LoadAndSaveWorks)
   EXPECT_FLOAT_EQ(score1, score2);
 }
 
+// Deterministic train+inference checksum used as a bit-to-bit regression guard.
+// subsample defaults to 1.0 (no stochastic bagging), so training is fully
+// reproducible and the prediction checksum is stable. Any change that alters
+// the numerical output - inference refactors, the speed-up path, etc. - is caught.
+TEST_F(ClassifierTest, BitwiseReproducibleTrainAndInference)
+{
+  auto checksum = [this](const FastBDT::Classifier & c) {
+    double s = 0.0;
+    for (unsigned int i = 0; i < y.size(); ++i)
+      s += c.predict({X[0][i], X[1][i], X[2][i], X[3][i]});
+    return s;
+  };
+
+  // Golden checksums captured from a known-good build, one per Weight precision.
+  // EXPECT_FLOAT_EQ gives a 4-ULP(float) tolerance so the guard is robust to
+  // platform floating-point noise while still catching real numerical changes.
+  // Update these values only on an intentional change of the train/infer numerics.
+  struct Case { unsigned int nTrees, depth, bin; double shrinkage, goldenFloat, goldenDouble; };
+  const std::vector<Case> cases = {
+    { 50, 3, 2, 0.10, 49.478123930748552, 49.478123691864312 },
+    { 20, 2, 3, 0.10, 47.232658147811890, 47.232657302170992 },
+    {100, 4, 2, 0.05, 49.807151805725880, 49.807151803863235 },
+    { 30, 3, 4, 0.20, 49.800116222002544, 49.800116274098400 },
+  };
+  const bool dbl = (sizeof(FastBDT::Weight) == sizeof(double));
+
+  for (const auto& c : cases) {
+    const std::vector<unsigned int> binning(4, c.bin);
+    FastBDT::Classifier clf(c.nTrees, c.depth, binning, c.shrinkage);
+    clf.fit(X, y, w);
+    const double score = checksum(clf);
+
+    EXPECT_FLOAT_EQ(score, dbl ? c.goldenDouble : c.goldenFloat)
+        << "checksum drift for nTrees=" << c.nTrees << " depth=" << c.depth
+        << " bin=" << c.bin << " shrinkage=" << c.shrinkage;
+
+    // Retraining with identical settings must reproduce the score bit-for-bit.
+    FastBDT::Classifier reclf(c.nTrees, c.depth, binning, c.shrinkage);
+    reclf.fit(X, y, w);
+    EXPECT_EQ(checksum(reclf), score);
+  }
+}
+
