@@ -58,9 +58,12 @@ namespace FastBDT {
                                  features.size()) + " vs " + std::to_string(nFeatures) + " + " + std::to_string(nSpectators));
     }
 
-    // Check if the feature values are in the correct range
+    // Check if the feature values are in the correct range. Valid bin indices
+    // are 0 .. nBins-1 (bin 0 is the NaN bin, 1..2^nLevels the ordinary bins);
+    // a value equal to nBins is one past the last valid bin and would later
+    // cause an out-of-bounds write in CumulativeDistributions::CalculateCDFs.
     for (unsigned int iFeature = 0; iFeature < nFeatures + nSpectators; ++iFeature) {
-      if (features[iFeature] > nBins[iFeature])
+      if (features[iFeature] >= nBins[iFeature])
         throw std::runtime_error(std::string("Promised number of bins is violated. ") + std::to_string(
                                    features[iFeature]) + " vs " + std::to_string(nBins[iFeature]));
     }

@@ -65,8 +65,8 @@ namespace FastBDT {
     FeatureBinning(unsigned int nLevels, std::vector<Value>& values) : nLevels(nLevels)
     {
 
-      if (nLevels < 2) {
-        throw std::runtime_error("Binning level must be at least two!");
+      if (nLevels == 0) {
+        throw std::runtime_error("Binning level must be at least 1 (nLevels=0 would cause unsigned underflow in BinToValue)");
       }
 
       auto first = values.begin();
@@ -75,7 +75,7 @@ namespace FastBDT {
       std::sort(first, last, compareIncludingNaN<Value>);
 
       // Wind iterator forward until first finite value
-      while (std::isnan(*first) and first != last) {
+      while (first != last and std::isnan(*first)) {
         first++;
       }
 
@@ -249,6 +249,12 @@ namespace FastBDT {
     FeatureBinning(const FeatureBinning&) = default;
     FeatureBinning& operator=(const FeatureBinning&) = default;
 
+    // For deserialization: store a pre-computed binary-tree binning directly,
+    // bypassing the data-sorting and uniqueify logic in the main constructor.
+    struct PrecomputedTag {};
+    FeatureBinning(unsigned int _nLevels, std::vector<Value> _binning, PrecomputedTag)
+      : binning(std::move(_binning)), nLevels(_nLevels) {}
+
   protected:
     /**
      * The binning boundaries of the feature. The bin boundaries are organized in binary tree structure.
@@ -315,13 +321,23 @@ namespace FastBDT {
       std::vector<ValueWithWeight<Value>> values_with_weights;
       values_with_weights.resize(values.size());
       Weight total_weight = 0;
-      unsigned long int numberOfDistinctValues = 1;
       for (unsigned int iEvent = 0; iEvent < values.size(); ++iEvent) {
         values_with_weights[iEvent] = {values[iEvent], weights[iEvent]};
         if (not std::isnan(values[iEvent]))
           total_weight += weights[iEvent];
-        if (iEvent > 0 and values[iEvent] != values[iEvent - 1]) {
-          numberOfDistinctValues++;
+      }
+
+      // Count distinct non-NaN values from sorted input so that unsorted or
+      // interleaved data does not inflate the count (consecutive comparison on
+      // unsorted input over-counts and suppresses the equal-frequency fallback).
+      unsigned long int numberOfDistinctValues = 0;
+      {
+        std::vector<Value> sorted_vals(values.begin(), values.end());
+        std::sort(sorted_vals.begin(), sorted_vals.end(), compareIncludingNaN<Value>);
+        for (unsigned int i = 0; i < sorted_vals.size(); ++i) {
+          if (std::isnan(sorted_vals[i])) continue;
+          if (numberOfDistinctValues == 0 or sorted_vals[i] != sorted_vals[i - 1])
+            ++numberOfDistinctValues;
         }
       }
 
@@ -336,7 +352,7 @@ namespace FastBDT {
       std::sort(first, last, compareWithWeightsIncludingNaN<Value>);
 
       // Wind iterator forward until first finite value
-      while (std::isnan(first->value) and first != last) {
+      while (first != last and std::isnan(first->value)) {
         first++;
       }
 
@@ -404,7 +420,7 @@ namespace FastBDT {
       auto first = values.begin();
       auto last = values.end();
       // Wind iterator forward until first finite value
-      while (std::isnan(*first) and first != last) {
+      while (first != last and std::isnan(*first)) {
         first++;
       }
 

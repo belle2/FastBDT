@@ -264,7 +264,10 @@ namespace FastBDT {
     std::vector<T> bins;
     stream >> bins;
 
-    return FeatureBinning<T>(nLevels, bins);
+    // Use the PrecomputedTag constructor to store the binary tree directly. The
+    // regular constructor would re-sort the values and may trigger the uniqueify
+    // step, producing a different binning after a serialisation round-trip.
+    return FeatureBinning<T>(nLevels, std::move(bins), typename FeatureBinning<T>::PrecomputedTag{});
 
   }
 
