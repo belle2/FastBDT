@@ -1,5 +1,14 @@
 from setuptools import setup, find_packages
 
+_install_requires = [
+    'numpy>=1.20',
+]
+# pytest is only needed to run the Python interface tests, so it is added as a
+# requirement only when FastBDT is built with testing enabled.
+_build_testing = "@BUILD_TESTING@".upper() in ("ON", "TRUE", "1", "YES")
+if _build_testing:
+    _install_requires.append('pytest>=6.0')
+
 setup(
     name='PyFastBDT',
     version='@FastBDT_VERSION_MAJOR@.@FastBDT_VERSION_MINOR@',
@@ -17,7 +26,5 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
     ],
     python_requires='>=3.7',
-    install_requires=[
-        'numpy>=1.20',
-    ],
+    install_requires=_install_requires,
 )
