@@ -1034,7 +1034,24 @@ namespace FastBDT {
     Forest(double shrinkage, double F0, bool transform2probability) : shrinkage(shrinkage), F0(F0),
       transform2probability(transform2probability) { F0_div_shrink = F0 / shrinkage; }
 
-    void AddTree(const Tree<T>& tree) { forest.push_back(tree); }
+    void AddTree(const Tree<T>& tree)
+    {
+      forest.push_back(tree);
+
+      // Also append a cache-dense copy of this tree for fast inference (see the
+      // m_flat* members). The on-disk format and the Tree<T> objects are
+      // untouched; this is purely an internal acceleration structure.
+      const auto& cuts = tree.GetCuts();
+      for (const auto& cut : cuts)
+        m_flatCuts.push_back(FastCut{cut.valid ? cut.feature : kInvalidFeature, cut.index});
+      m_cutOffsets.push_back(static_cast<unsigned int>(m_flatCuts.size()));
+
+      const auto& boostWeights = tree.GetBoostWeights();
+      for (const auto& bw : boostWeights)
+        m_flatBoost.push_back(bw);
+      m_boostOffsets.push_back(static_cast<unsigned int>(m_flatBoost.size()));
+    }
+
     const std::vector<Tree<T>>& GetForest() const { return forest; }
     double GetF0() const { return F0; }
     double GetShrinkage() const { return shrinkage; }
@@ -1045,16 +1062,41 @@ namespace FastBDT {
      * The F value can be used to calculate the signal probability or the weight
      * of the event in the next boosted training.
      * @param values the feature values of the event in an arbitrary iterator supporting operator[]
+     *
+     * Uses the flattened, cache-dense representation built in AddTree: all cuts
+     * of all trees live in one contiguous array (8 bytes each instead of the
+     * 24-byte Cut, whose gain is unused at inference), and all boost weights in
+     * another, so the forest is walked with sequential memory access. This is
+     * notably faster for large forests whose Cut arrays no longer fit in cache.
+     * The result is identical to walking the Tree<T> objects directly.
      */
     template<class Iterator>
     double GetF(const Iterator& values) const
     {
-
-      // Determines the F value by looping over all trees and
-      // summing up the weights of the nodes the event belongs to.
       double F = F0_div_shrink;
-      for (auto& tree : forest)
-        F += tree.GetBoostWeight(tree.ValueToNode(values));
+
+      const FastCut* const flatCuts = m_flatCuts.data();
+      const Weight* const flatBoost = m_flatBoost.data();
+      const unsigned int nTrees = static_cast<unsigned int>(m_cutOffsets.size()) - 1;
+
+      for (unsigned int t = 0; t < nTrees; ++t) {
+        const FastCut* const cutData = flatCuts + m_cutOffsets[t];
+        const unsigned int nCuts = m_cutOffsets[t + 1] - m_cutOffsets[t];
+
+        unsigned int node = 1;
+        while (node <= nCuts) {
+          const FastCut& cut = cutData[node - 1];
+          if (cut.feature == kInvalidFeature)
+            break;
+          const T& value = values[cut.feature];
+          if (is_nan<T>(value))
+            break;
+          node = (node << 1) + static_cast<unsigned int>(value >= cut.index);
+        }
+
+        F += flatBoost[m_boostOffsets[t] + (node - 1)];
+      }
+
       return F * shrinkage;
     }
 
@@ -1133,11 +1175,30 @@ namespace FastBDT {
     }
 
   private:
+    // Cache-dense cut used only for inference (GetF). Holds just the fields the
+    // traversal needs: 8 bytes for T=float instead of the 24-byte Cut<T> (whose
+    // 8-byte gain is never read at inference). An invalid cut is encoded by
+    // feature == kInvalidFeature, removing the separate bool.
+    struct FastCut {
+      unsigned int feature;
+      T index;
+    };
+    static constexpr unsigned int kInvalidFeature = std::numeric_limits<unsigned int>::max();
+
     double shrinkage = 0.0;
     double F0 = 0.0;
     double F0_div_shrink = 0.0;
     std::vector<Tree<T>> forest;
     bool transform2probability = false;
+
+    // Flattened forest for inference, built incrementally in AddTree.
+    // m_flatCuts/m_flatBoost concatenate every tree's cuts/boost-weights; the
+    // *Offsets vectors are CSR-style starts with a trailing total, so tree t
+    // owns [offset[t], offset[t+1]).
+    std::vector<FastCut> m_flatCuts;
+    std::vector<Weight> m_flatBoost;
+    std::vector<unsigned int> m_cutOffsets{0};
+    std::vector<unsigned int> m_boostOffsets{0};
 
   };
 
