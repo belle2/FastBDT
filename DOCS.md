@@ -11,7 +11,7 @@ FastBDT trains a **stochastic gradient-boosted decision tree** (BDT) classifier 
 
 It is optimised for speed, both when fitting and when applying the model:
 
-- **Equal-frequency binning**: each feature is mapped once to a small integer bin index (`2^nCutLevels` bins).
+- **Equal-frequency binning**: each feature is mapped once to a small integer bin index (`2^N` bins, where `N` is the per-feature binning level; see [§2](#2-hyperparameters)).
   Training then operates on integers instead of floats, and the cut search is a cheap histogram scan.
 - **Cache-friendly layout**: events are stored as a flat, contiguous array of bin indices, accessed linearly.
 
@@ -19,7 +19,7 @@ The result is typically about an order of magnitude faster than general-purpose 
 
 #### Key concepts
 
-- **Feature binning**: for each feature the training data is binned into `2^nCutLevels` bins by quantiles (equal frequency).
+- **Feature binning**: for each feature the training data is binned into `2^N` equal-frequency (quantile) bins, where `N` is the per-feature binning level (see [§2](#2-hyperparameters)).
   Bin `0` is reserved for **NaN**, which FastBDT treats as a genuine "missing / not measured" value and routes through the tree separately - you can pass `NaN` features at training and application time.
 - **Trees**: each tree has a fixed depth (`depth` cut layers: up to `2^depth` leaves).
   At each node the best Gini-gain cut over all features/bins is chosen.
@@ -33,21 +33,42 @@ The result is typically about an order of magnitude faster than general-purpose 
 
 ### 2. Hyperparameters
 
-The same hyperparameters are exposed by all interfaces.
-Defaults differ slightly between the C++ interface and the Python one (noted below).
+The same hyperparameters are exposed by all interfaces; only the defaults differ between the C++ and Python interfaces.
 
-| Parameter | Meaning | C++ default | Python default |
-| --- | --- | --- | --- |
-| `nTrees` | Number of boosting iterations (trees). | - (required) | `100` |
-| `depth` | Tree depth = number of cut layers; up to `2^depth` leaves. | - (required) | `3` |
-| `binning` / `nCutLevels` | Per-feature binning level `N`; the feature gets `2^N` bins. C++ takes one value per feature; Python auto-fills `8` per feature if the list is empty. | - (required) | `[]` -> `8` per feature |
-| `shrinkage` | Learning rate; smaller is slower but more stable. | `0.1` | `0.1` |
-| `subsample` | Fraction of events used per tree (`1.0` = deterministic). | `1.0` | `0.5` |
-| `transform2probability` | Map the score to a probability in `[0, 1]`. | `true` | `True` |
-| `purityTransformation` | Per-feature flag to add a purity-ordered version of the feature (see [§6](#specialised-features)). | `{}` | `[]` |
-| `sPlot` | Treat the sample weights as sPlot weights (see [§6](#specialised-features)). | `false` | `False` |
-| `flatnessLoss` | Strength of uniform boosting; `> 0` enables it (see [§6](#specialised-features)). | `-1.0` | `-1.0` |
-| `numberOfFlatnessFeatures` | Number of trailing *spectator* features used only for the flatness penalty (see [§6](#specialised-features)). | `0` | `0` |
+| Parameter | C++ default | Python default |
+| --- | --- | --- |
+| `nTrees` | - (required) | `100` |
+| `depth` | - (required) | `3` |
+| `binning` | - (required) | `[]` -> `8` per feature |
+| `shrinkage` | `0.1` | `0.1` |
+| `subsample` | `1.0` | `0.5` |
+| `transform2probability` | `true` | `True` |
+
+- **`nTrees`**: the number of boosting iterations; one tree is added per iteration.
+- **`depth`**: the depth of each tree, i.e. the number of cut layers; a tree has up to `2^depth` leaves.
+- **`binning`**: a per-feature list of *binning levels*; each entry is a level `N` (also called `nCutLevels`) and produces `2^N` bins, so `binning = [8, 8, 8, 8]` describes four features with `2^8 = 256` bins each.
+  In C++ one value per feature is required; in Python an empty list auto-fills `8` per feature.
+- **`shrinkage`**: the learning rate applied to every tree; smaller values converge more slowly but more stably.
+- **`subsample`**: the fraction of events drawn for each tree (stochastic bagging); `1.0` uses every event and makes training fully deterministic.
+- **`transform2probability`**: when enabled (the default), the raw score is mapped to a signal probability in `[0, 1]`; otherwise the raw boosted score `F` is returned.
+
+#### Specialised features
+
+FastBDT provides a number of specialised features, exposed by all interfaces:
+
+| Parameter | C++ default | Python default |
+| --- | --- | --- |
+| `purityTransformation` | `{}` | `[]` |
+| `sPlot` | `false` | `False` |
+| `flatnessLoss` | `-1.0` | `-1.0` |
+| `numberOfFlatnessFeatures` | `0` | `0` |
+
+- **`purityTransformation`**: a per-feature list of flags; for each flagged feature FastBDT adds a companion feature whose bins are re-ordered by signal purity.
+  This can help when a feature's relationship to the label is non-monotonic, at the cost of somewhat slower inference; it is off by default.
+- **`sPlot`**: enables the special handling for sPlot-weighted training data, where signal and background are represented statistically via per-event weights rather than hard labels.
+- **`flatnessLoss`**: the strength of the uniform-boosting ("flatness") penalty; a value `> 0` enables it, while the default `-1.0` disables it.
+  The penalty keeps the classifier output flat (uniform) with respect to the flatness features, which is useful when a distribution must not be sculpted (e.g. an invariant mass); see [arXiv:1410.4140](https://arxiv.org/abs/1410.4140).
+- **`numberOfFlatnessFeatures`**: the number of input features (the **last ones** in the feature ordering) to treat as flatness (spectator) features, used only by the flatness penalty and never as classifier inputs.
 
 ---
 
@@ -173,17 +194,6 @@ Delete(clf);                       /* releases the handle */
 
 Every `Classifier` method has a direct counterpart here - `Fit`, `Predict`, `PredictArray`, `Save`, `Load`, the `Set*` configuration functions, and the variable-ranking helpers.
 `IsWeightFloat()` tells you whether the build uses single- or double-precision weights, which is handy when you fill the `weight_ptr` passed to `Fit`.
-
----
-
-### 6. Specialised features
-
-- **Purity transformation** (`purityTransformation`): for a selected feature, FastBDT can add a companion feature whose bins are re-ordered by signal purity.
-  This can help when a feature's relationship to the label is non-monotonic.
-  It makes inference somewhat slower and is off by default.
-- **Uniform boosting / flatness loss** (`flatnessLoss`, `numberOfFlatnessFeatures`): when `flatnessLoss > 0`, the boosting adds a penalty that keeps the classifier output **flat** (uniform) with respect to the trailing spectator ("flatness") features, which is useful when a distribution must not be sculpted (e.g. an invariant mass).
-  Further detail is in [arXiv:1410.4140](https://arxiv.org/abs/1410.4140).
-- **sPlot** (`sPlot`): this enables the special handling needed when you train on sPlot-weighted data, where signal and background are represented statistically via per-event weights rather than hard labels.
 
 ---
 
