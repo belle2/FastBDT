@@ -29,7 +29,43 @@ The original repository can be found at: https://github.com/thomaskeck/FastBDT
 
 ### Installation
 
-To build and install FastBDT, use the following commands:
+#### From `conda-forge` (recommended for users)
+
+FastBDT is packaged on [`conda-forge`](https://conda-forge.org/), which ships the pre-compiled C/C++ libraries together with the Python bindings, so no manual build is required.
+Two packages are available, differing only in the internal weight precision (see [Weight type and numerical precision](#weight-type-and-numerical-precision)):
+
+| Package | Weight | Downloads | Version | Platforms |
+| --- | --- | --- | --- | --- |
+| `fastbdt` | `float` | [![](https://img.shields.io/conda/dn/conda-forge/fastbdt.svg)](https://anaconda.org/conda-forge/fastbdt) | [![](https://img.shields.io/conda/vn/conda-forge/fastbdt.svg)](https://anaconda.org/conda-forge/fastbdt) | [![](https://img.shields.io/conda/pn/conda-forge/fastbdt.svg)](https://anaconda.org/conda-forge/fastbdt) |
+| `fastbdt-double-weight` | `double` | [![](https://img.shields.io/conda/dn/conda-forge/fastbdt-double-weight.svg)](https://anaconda.org/conda-forge/fastbdt-double-weight) | [![](https://img.shields.io/conda/vn/conda-forge/fastbdt-double-weight.svg)](https://anaconda.org/conda-forge/fastbdt-double-weight) | [![](https://img.shields.io/conda/pn/conda-forge/fastbdt-double-weight.svg)](https://anaconda.org/conda-forge/fastbdt-double-weight) |
+
+Using `conda`:
+
+```bash
+conda install -c conda-forge fastbdt
+# or, for the double-precision build:
+conda install -c conda-forge fastbdt-double-weight
+```
+
+Using [`pixi`](https://pixi.sh/) inside a project (`conda-forge` is the default channel):
+
+```bash
+pixi add fastbdt
+# or, for the double-precision build:
+pixi add fastbdt-double-weight
+```
+
+To install it into a global pixi environment instead of a project, use
+
+```bash
+pixi global install fastbdt
+# or, for the double-precision build:
+pixi global install fastbdt-double-weight
+```
+
+#### From source
+
+To build and install FastBDT from source, use the following commands:
 
 ```bash
 mkdir -p build install && cd build
@@ -39,6 +75,7 @@ make install
 ```
 
 This will also install the Python bindings automatically if CMake detects a valid `python3` interpreter during the configuration step.
+To build the double-precision variant from source, see [Weight type and numerical precision](#weight-type-and-numerical-precision).
 
 ---
 
@@ -50,18 +87,23 @@ Typically, you will want to use FastBDT as a library integrated directly into yo
 - the C shared library
 - the Python library `PyFastBDT/FastBDT.py` (see `examples/iris_example.py` and `examples/generic_example.py`)
 
+For a broader description of how FastBDT works, its configuration options, and the C++/C/Python APIs, see **[DOCS.md](DOCS.md)**.
+
 ---
 
 ### Weight type and numerical precision
 
 By default, FastBDT uses **single-precision floating point** (`float`) as type for internal weights in the C++ implementation. This choice is made for performance reasons and is sufficient for most use cases.
-If higher numerical precision is required, FastBDT can be compiled using **double-precision floating point** (`double`) weights by enabling the following CMake option at configuration time:
+If higher numerical precision is required, a **double-precision floating point** (`double`) build is available in two ways:
 
-```bash
-cmake .. -DUSE_DOUBLE_WEIGHT=ON
-```
+- **From `conda-forge`:** install the `fastbdt-double-weight` package instead of `fastbdt` (see [Installation](#installation)).
+- **From source:** enable the corresponding CMake option at configuration time:
 
-This changes the internal weight type used throughout the FastBDT codebase.
+  ```bash
+  cmake .. -DUSE_DOUBLE_WEIGHT=ON
+  ```
+
+Either way, this changes the internal weight type used throughout the FastBDT codebase.
 
 #### Weight type in C++
 
