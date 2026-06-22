@@ -1,27 +1,17 @@
 # FastBDT
 
-Stochastic gradient-boosted decision trees for multivariate classification, usable standalone and via Python interface.
+Stochastic gradient-boosted decision trees for binary classification, with interfaces for Python, C++ and C.
+FastBDT is a speed-optimised, cache-friendly implementation that is about an order of magnitude faster than general-purpose implementations such as TMVA, scikit-learn and XGBoost, at both training and application.
+It is used extensively in high-energy physics by the Belle II Collaboration.
 
-**Check the paper on ArXiv: [FastBDT: A speed-optimized and cache-friendly implementation of stochastic gradient-boosted decision trees for multivariate classification](http://arxiv.org/abs/1609.06119)**
-
-Stochastic gradient-boosted decision trees are widely employed for multivariate classification and regression tasks.
-This paper presents a speed-optimized and cache-friendly implementation for multivariate classification called FastBDT.
-FastBDT is one order of magnitude faster during the fitting and application phases compared to popular implementations in frameworks like TMVA, scikit-learn, and XGBoost.
-The concepts used to optimize execution time and performance are discussed in detail in this paper. Key ideas include:
-
-- equal-frequency binning on the input data, which allows replacing expensive floating-point operations with integer operations while improving classification quality;
-- a cache-friendly linear access pattern to the input data, in contrast to typical implementations that exhibit random access patterns.
-
-FastBDT provides interfaces to C/C++ and Python.
-It is extensively used in high energy physics by the Belle II Collaboration.
+**Check the paper on arXiv**: [FastBDT: A speed-optimized and cache-friendly implementation of stochastic gradient-boosted decision trees for multivariate classification](http://arxiv.org/abs/1609.06119)
 
 ---
 
-### Warning
+### Important
 
 This repository is a fork maintained by the Belle II Collaboration.
 It is guaranteed to compile with modern compilers and the unit tests and main examples are fully functional, unless stated otherwise.
-However, **no further development of this fork is currently planned**.
 
 The original repository can be found at: https://github.com/thomaskeck/FastBDT
 
@@ -31,7 +21,7 @@ The original repository can be found at: https://github.com/thomaskeck/FastBDT
 
 #### From `conda-forge` (recommended for users)
 
-FastBDT is packaged on [`conda-forge`](https://conda-forge.org/), which ships the pre-compiled C/C++ libraries together with the Python bindings, so no manual build is required.
+FastBDT is packaged on [`conda-forge`](https://conda-forge.org/), which ships the Python bindings together with the pre-compiled C++ and C libraries, so no manual build is required.
 Two packages are available, differing only in the internal weight precision (see [Weight type and numerical precision](#weight-type-and-numerical-precision)):
 
 | Package | Weight | Downloads | Version | Platforms |
@@ -83,11 +73,11 @@ To build the double-precision variant from source, see [Weight type and numerica
 
 Typically, you will want to use FastBDT as a library integrated directly into your application. Available interfaces:
 
+- the Python library `PyFastBDT/FastBDT.py` (see `examples/iris_example.py` and `examples/generic_example.py`)
 - the C++ shared/static library (see `examples/IRISExample.cxx`)
 - the C shared library
-- the Python library `PyFastBDT/FastBDT.py` (see `examples/iris_example.py` and `examples/generic_example.py`)
 
-For a broader description of how FastBDT works, its configuration options, and the C++/C/Python APIs, see **[DOCS.md](DOCS.md)**.
+For a broader description of how FastBDT works, its configuration options, and the Python, C++ and C APIs, see **[DOCS.md](DOCS.md)**.
 
 ---
 
@@ -96,8 +86,8 @@ For a broader description of how FastBDT works, its configuration options, and t
 By default, FastBDT uses **single-precision floating point** (`float`) as type for internal weights in the C++ implementation. This choice is made for performance reasons and is sufficient for most use cases.
 If higher numerical precision is required, a **double-precision floating point** (`double`) build is available in two ways:
 
-- **From `conda-forge`:** install the `fastbdt-double-weight` package instead of `fastbdt` (see [Installation](#installation)).
-- **From source:** enable the corresponding CMake option at configuration time:
+- **from `conda-forge`**: install the `fastbdt-double-weight` package instead of `fastbdt` (see [Installation](#installation)).
+- **from source**: enable the corresponding CMake option at configuration time:
 
   ```bash
   cmake .. -DUSE_DOUBLE_WEIGHT=ON
@@ -105,15 +95,15 @@ If higher numerical precision is required, a **double-precision floating point**
 
 Either way, this changes the internal weight type used throughout the FastBDT codebase.
 
-#### Weight type in C++
-
-When working with FastBDT in C++, it is strongly recommended to use the type alias `FastBDT::Weight`, which is available via the header `FastBDT.h`, for all weight-related variables, rather than explicitly using `float` or `double`.
-This ensures that user code remains compatible regardless of whether FastBDT is built with single or double precision.
-
 #### Weight type in Python
 
 The Python interface automatically handles the internal weight type and requires no user action.
 Switching between single and double precision is entirely transparent to Python users.
+
+#### Weight type in C++
+
+When working with FastBDT in C++, it is strongly recommended to use the type alias `FastBDT::Weight`, which is available via the header `FastBDT.h`, for all weight-related variables, rather than explicitly using `float` or `double`.
+This ensures that user code remains compatible regardless of whether FastBDT is built with single or double precision.
 
 ---
 
