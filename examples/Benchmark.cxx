@@ -10,6 +10,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -70,6 +71,13 @@ static std::string humanSize(unsigned n)
   if (n >= 1000000) return std::to_string(n / 1000000) + "M";
   if (n >= 1000)    return std::to_string(n / 1000)    + "k";
   return std::to_string(n);
+}
+
+template<class V>
+static void freeStorage(V& v)
+{
+  v.clear();
+  v.shrink_to_fit();
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +182,11 @@ static void benchmarkInference(unsigned nRepeat)
   auto clf = makeClassifier(nFeatures);
   clf.fit(Xtrain, ytrain, wtrain);
 
+  // The training data is no longer needed: let's release it
+  freeStorage(Xtrain);
+  freeStorage(ytrain);
+  freeStorage(wtrain);
+
   printHeader("Inference (trained on 100k events, 10 features)");
 
   const std::vector<unsigned> sizes = {1000, 10000, 100000, 1000000};
@@ -189,6 +202,11 @@ static void benchmarkInference(unsigned nRepeat)
     for (unsigned iEvent = 0; iEvent < nEvents; ++iEvent)
       for (unsigned iFeat = 0; iFeat < nFeatures; ++iFeat)
         rows[iEvent][iFeat] = Xtest[iFeat][iEvent];
+
+    // Only `rows` is used below: let's release the rest
+    freeStorage(Xtest);
+    freeStorage(ytest);
+    freeStorage(wtest);
 
     std::vector<double> times;
     times.reserve(nRepeat);
@@ -231,7 +249,7 @@ static void benchmarkSerialisation(unsigned nRepeat)
   oss << clf;
   const std::string serialised = oss.str();
 
-  printHeader("Serialisation  (100k training events, 10 features, 100 trees)");
+  printHeader("Serialisation  (100k training events, 10 features, 400 trees)");
 
   // Save
   {
@@ -261,6 +279,7 @@ static void benchmarkSerialisation(unsigned nRepeat)
       times.push_back(Ms(t1 - t0).count());
     }
     printRow("load (istream)", computeStats(times), "ms");
+    // Print checksum so the compiler cannot eliminate the loop above
     std::cout << "  (checksum=" << checksum << ")\n";
   }
 
@@ -274,17 +293,23 @@ static void benchmarkSerialisation(unsigned nRepeat)
 int main(int argc, char* argv[])
 {
   unsigned nRepeat = 5;
+
   if (argc >= 2) {
     try {
-      nRepeat = static_cast<unsigned>(std::stoul(argv[1]));
+      std::size_t pos = 0;
+      long value = std::stol(argv[1], &pos);
+      if (pos != std::strlen(argv[1])) {
+        throw std::invalid_argument("trailing characters");
+      }
+      if (value < 2 || value > 50) {
+        std::cerr << "nRepeat must be between 2 and 50\n";
+        return 1;
+      }
+      nRepeat = static_cast<unsigned>(value);
     } catch (...) {
-      std::cerr << "Usage: " << argv[0] << " [nRepeat>=2]\n";
+      std::cerr << "Usage: " << argv[0] << " [2 <= nRepeat <= 50]\n";
       return 1;
     }
-  }
-  if (nRepeat < 2) {
-    std::cerr << "nRepeat must be >= 2\n";
-    return 1;
   }
 
   std::cout << "FastBDT Benchmark  (nRepeat=" << nRepeat << ")\n";
