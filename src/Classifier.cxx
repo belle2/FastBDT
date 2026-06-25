@@ -32,6 +32,13 @@ namespace FastBDT {
         m_purityTransformation.push_back(false);
     }
 
+    // Reset per-fit mutable state so re-fitting the same object starts clean.
+    // m_featureBinning is filled with push_back below, so it must be empty;
+    // otherwise the later resize() would keep the previous fit's binnings.
+    m_featureBinning.clear();
+    m_purityBinning.clear();
+    m_can_use_fast_forest = true;
+
     for (auto p : m_purityTransformation)
       if (p)
         m_can_use_fast_forest = false;
