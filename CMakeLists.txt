@@ -34,12 +34,12 @@ set(FastBDT_SOURCES
 )
 
 set(FastBDT_TESTS
-  "${PROJECT_SOURCE_DIR}/src/test_all.cxx"
-  "${PROJECT_SOURCE_DIR}/src/test_FastBDT.cxx"
-  "${PROJECT_SOURCE_DIR}/src/test_Performance.cxx"
-  "${PROJECT_SOURCE_DIR}/src/test_Classifier.cxx"
-  "${PROJECT_SOURCE_DIR}/src/test_FastBDT_IO.cxx"
-  "${PROJECT_SOURCE_DIR}/src/test_FastBDT_C_API.cxx"
+  "${PROJECT_SOURCE_DIR}/tests/test_all.cxx"
+  "${PROJECT_SOURCE_DIR}/tests/test_FastBDT.cxx"
+  "${PROJECT_SOURCE_DIR}/tests/test_Performance.cxx"
+  "${PROJECT_SOURCE_DIR}/tests/test_Classifier.cxx"
+  "${PROJECT_SOURCE_DIR}/tests/test_FastBDT_IO.cxx"
+  "${PROJECT_SOURCE_DIR}/tests/test_FastBDT_C_API.cxx"
 )
 
 set(FastBDT_HEADERS
