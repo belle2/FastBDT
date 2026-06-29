@@ -10,6 +10,7 @@
 
 #include <sstream>
 #include <limits>
+#include <cmath>
 
 #include <algorithm>
 #include <random>
@@ -244,5 +245,90 @@ TEST_F(ClassifierTest, BitwiseReproducibleTrainAndInference)
     reclf.fit(X, y, w);
     EXPECT_EQ(checksum(reclf), score);
   }
+}
+
+
+TEST_F(ClassifierTest, LoadAndSaveWorksWithPurityTransformation)
+{
+  // The purity-transformation path stores cuts in bin-space (m_binned_forest).
+  // Verify that the serialisation round-trip preserves the score exactly.
+  FastBDT::Classifier classifier(10, 3, {4, 4, 4, 4});
+  classifier.SetPurityTransformation({true, false, false, false});
+  classifier.fit(X, y, w);
+
+  float score1 = GetIrisScore(classifier);
+
+  std::ostringstream oss;
+  oss << classifier;
+
+  std::istringstream iss(oss.str());
+  FastBDT::Classifier classifier2(iss);
+
+  float score2 = GetIrisScore(classifier2);
+
+  EXPECT_FLOAT_EQ(score1, score2);
+}
+
+TEST_F(ClassifierTest, FitCalledTwiceWithoutPurityTransformationSucceeds)
+{
+  // Without purity transformation m_binning does not grow between fits, so a
+  // second fit on the same object must succeed and reproduce the same score
+  // (subsample defaults to 1.0 via the constructor, so training is deterministic).
+  FastBDT::Classifier classifier(10, 3, {4, 4, 4, 4});
+  classifier.fit(X, y, w);
+  float score1 = GetIrisScore(classifier);
+
+  classifier.fit(X, y, w);
+  float score2 = GetIrisScore(classifier);
+
+  EXPECT_FLOAT_EQ(score1, score2);
+}
+
+TEST_F(ClassifierTest, FitCalledTwiceOnDifferentDataGivesSameResultAsFreshFit)
+{
+  // Re-fitting a Classifier on different data must give the same predictions as
+  // a fresh Classifier fitted on that data. This tests that m_featureBinning is
+  // cleared before each fit: without the clear(), resize() after push_back() would
+  // keep the old entries (from the previous fit) instead of the newly computed ones.
+  const unsigned int half = 75;
+  std::vector<std::vector<float>> X_half(4);
+  for (unsigned int f = 0; f < 4; ++f)
+    X_half[f] = std::vector<float>(X[f].begin(), X[f].begin() + half);
+  std::vector<bool>   y_half(y.begin(), y.begin() + half);
+  std::vector<Weight> w_half(w.begin(), w.begin() + half);
+
+  FastBDT::Classifier clf1(10, 3, {4, 4, 4, 4});
+  clf1.fit(X_half, y_half, w_half);  // first fit: first 75 events (no virginica)
+  clf1.fit(X, y, w);                 // re-fit: all 150 events
+
+  FastBDT::Classifier clf2(10, 3, {4, 4, 4, 4});
+  clf2.fit(X, y, w);                 // fresh fit on the same full dataset
+
+  for (unsigned int i = 0; i < 150; ++i) {
+    std::vector<float> event = {X[0][i], X[1][i], X[2][i], X[3][i]};
+    EXPECT_FLOAT_EQ(clf1.predict(event), clf2.predict(event));
+  }
+}
+
+TEST_F(ClassifierTest, FitCalledTwiceWithPurityTransformationThrows)
+{
+  // Each fit with purity transformation inserts an extra entry into m_binning.
+  // The second fit detects the size mismatch and throws.
+  FastBDT::Classifier classifier(10, 3, {4, 4, 4, 4});
+  classifier.SetPurityTransformation({true, false, false, false});
+  classifier.fit(X, y, w);
+
+  EXPECT_THROW(classifier.fit(X, y, w), std::runtime_error);
+}
+
+TEST_F(ClassifierTest, PredictBeforeFitDoesNotCrash)
+{
+  // Before fit, m_numberOfFeatures == 0, so predict() calls Analyse on the
+  // default-constructed forest with an empty feature vector. This should
+  // return a finite value rather than crashing or producing NaN.
+  FastBDT::Classifier classifier;
+  float result = classifier.predict({1.0f, 2.0f, 3.0f, 4.0f});
+  EXPECT_FALSE(std::isnan(result));
+  EXPECT_TRUE(std::isfinite(result));
 }
 

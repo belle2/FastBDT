@@ -125,6 +125,80 @@ TEST_F(IOTest, IOFeatureBinning)
 
 }
 
+TEST_F(IOTest, IOFeatureBinningFloat)
+{
+  // Classifier uses FeatureBinning<float>, so verify that type round-trips correctly.
+  std::vector<float> binning = { 1.0f, 7.0f, 4.0f, 10.0f, 12.0f };
+  FeatureBinning<float> before(2, binning);
+  const auto& before_binning = before.GetBinning();
+
+  std::stringstream stream;
+  stream << before;
+
+  auto after = readFeatureBinningFromStream<float>(stream);
+  const auto& after_binning = after.GetBinning();
+
+  EXPECT_EQ(before.GetNLevels(), after.GetNLevels());
+  EXPECT_EQ(before_binning.size(), after_binning.size());
+  for (unsigned int i = 0; i < before_binning.size() and i < after_binning.size(); ++i)
+    EXPECT_FLOAT_EQ_NAN_SAFE(before_binning[i], after_binning[i]);
+}
+
+// Regression test for the uniqueify-on-deserialize bug: when the serialized
+// boundary-value array has fewer than GetNBins()-2 distinct values, the main
+// FeatureBinning constructor would re-trigger the "uniqueify" step and rebuild
+// the binary tree from a collapsed dataset, changing cut positions.
+// The PrecomputedTag constructor must bypass that step entirely.
+//
+// Trigger condition: data clustered in the middle creates interior-duplicate
+// boundary values.  With {1,2,3,3,3,3,3,4,5} and nLevels=2 the 5 boundary
+// values hold only 3 distinct values (< GetNBins()-2 = 3 is exactly the
+// boundary, so use <=), causing uniqueify to fire and shift the root cut.
+TEST_F(IOTest, IOFeatureBinningWithDuplicateBoundaries)
+{
+  std::vector<double> data = {1.0, 2.0, 3.0, 3.0, 3.0, 3.0, 3.0, 4.0, 5.0};
+
+  FeatureBinning<double> before(2, data);
+  const auto& before_binning = before.GetBinning();
+
+  std::stringstream stream;
+  stream << before;
+
+  auto after = readFeatureBinningFromStream<double>(stream);
+  const auto& after_binning = after.GetBinning();
+
+  EXPECT_EQ(before.GetNLevels(), after.GetNLevels());
+  ASSERT_EQ(before_binning.size(), after_binning.size());
+  for (unsigned int i = 0; i < before_binning.size(); ++i)
+    EXPECT_DOUBLE_EQ_NAN_SAFE(before_binning[i], after_binning[i]);
+
+  for (double v : {0.5, 1.0, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 5.5})
+    EXPECT_EQ(before.ValueToBin(v), after.ValueToBin(v));
+}
+
+TEST_F(IOTest, IOFeatureBinningFloatWithDuplicateBoundaries)
+{
+  // Same regression as above for float (the type Classifier serializes).
+  std::vector<float> data = {1.0f, 2.0f, 3.0f, 3.0f, 3.0f, 3.0f, 3.0f, 4.0f, 5.0f};
+
+  FeatureBinning<float> before(2, data);
+  const auto& before_binning = before.GetBinning();
+
+  std::stringstream stream;
+  stream << before;
+
+  auto after = readFeatureBinningFromStream<float>(stream);
+  const auto& after_binning = after.GetBinning();
+
+  EXPECT_EQ(before.GetNLevels(), after.GetNLevels());
+  ASSERT_EQ(before_binning.size(), after_binning.size());
+  for (unsigned int i = 0; i < before_binning.size(); ++i)
+    EXPECT_FLOAT_EQ_NAN_SAFE(before_binning[i], after_binning[i]);
+
+  for (float v : {0.5f, 1.0f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f, 5.0f, 5.5f})
+    EXPECT_EQ(before.ValueToBin(v), after.ValueToBin(v));
+}
+
 TEST_F(IOTest, IOFeatureBinningVector)
 {
 
