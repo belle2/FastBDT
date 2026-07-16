@@ -8,17 +8,21 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'push' && $CI_COMMIT_BRANCH == 'master'
 
 .image_list: &image_list
-  # Compiler versions: N-5, N-3, N-1, N
-  - "gcc:10"
-  - "gcc:12"
-  - "gcc:14"
+  # Compiler versions: N, N-1, N-3, N-5
+  # GCC
+  - "gcc:16"
   - "gcc:15"
-  - "silkeh/clang:16"
-  - "silkeh/clang:18"
-  - "silkeh/clang:20"
+  - "gcc:13"
+  - "gcc:11"
+  # Clang
   - "silkeh/clang:21"
+  - "silkeh/clang:20"
+  - "silkeh/clang:18"
+  - "silkeh/clang:16"
   # Latest available Intel compiler
-  - "intel/oneapi-basekit:2025.3.1-0-devel-ubuntu24.04"
+  - "intel/oneapi-basekit:2025.3.2-0-devel-ubuntu24.04"
+
+.newest_image: &newest_image "gcc:16"  # The newest GCC image from the list above
 
 variables:
   DEBIAN_FRONTEND: "noninteractive"
@@ -80,18 +84,21 @@ default:
     if [[ "$UPGRADE_PIP" == "true" ]]; then
       pip install --upgrade pip setuptools wheel
     fi
-  - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE} && cd build/${SAFE_IMAGE}
+  - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE}
   - |
-    cmake ${CI_PROJECT_DIR} \
+    cmake -S ${CI_PROJECT_DIR} -B build/${SAFE_IMAGE} \
       -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install/${SAFE_IMAGE} \
-      -DUSE_DOUBLE_WEIGHT=${CMAKE_USE_DOUBLE_WEIGHT}
-  - make -j$(nproc)
-  - make -j$(nproc) install
+      -DUSE_DOUBLE_WEIGHT=${CMAKE_USE_DOUBLE_WEIGHT} \
+      -DPYTHON=$(which python3)
+  - cmake --build build/${SAFE_IMAGE} -j $(nproc)
+  - cmake --install build/${SAFE_IMAGE}
+  # Run from /tmp so Python cannot accidentally import the package from the source tree
+  - cd /tmp
   - python3 -c "import PyFastBDT;print('PyFastBDT version:', PyFastBDT.__version__)"
+  - python3 -c "import PyFastBDT.FastBDT as FastBDT;print('PyFastBDT uses float for weights:', FastBDT._is_weight_float)"
 
 .test_script: &test_script
   - source venv/${SAFE_IMAGE}/bin/activate
-  - python3 -c "import PyFastBDT.FastBDT as FastBDT;print('PyFastBDT uses float for weights:', FastBDT._is_weight_float)"
   # Run the unit tests
   - ./install/${SAFE_IMAGE}/bin/fastbdt-unittests
   - python3 -m pytest tests/test_python_interface.py
@@ -112,11 +119,9 @@ build:
   parallel:
     matrix:
       - IMAGE: *image_list
-      # One image is enough. The newest gcc image is selected.
-      - IMAGE: "gcc:15"
+      - IMAGE: *newest_image
         CMAKE_USE_DOUBLE_WEIGHT: "ON"
-      # One image is enough. The newest gcc image is selected.
-      - IMAGE: "gcc:15"
+      - IMAGE: *newest_image
         UPGRADE_PIP: "true"
   script: *build_script
   artifacts:
@@ -134,7 +139,6 @@ test:
   parallel:
     matrix:
       - IMAGE: *image_list
-      # One image is enough. The newest gcc image is selected.
-      - IMAGE: "gcc:15"
+      - IMAGE: *newest_image
         CMAKE_USE_DOUBLE_WEIGHT: "ON"
   script: *test_script
