@@ -8,17 +8,21 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'push' && $CI_COMMIT_BRANCH == 'master'
 
 .image_list: &image_list
-  # Compiler versions: N-5, N-3, N-1, N
-  - "gcc:10"
-  - "gcc:12"
-  - "gcc:14"
+  # Compiler versions: N, N-1, N-3, N-5
+  # GCC
+  - "gcc:16"
   - "gcc:15"
-  - "silkeh/clang:16"
-  - "silkeh/clang:18"
-  - "silkeh/clang:20"
+  - "gcc:13"
+  - "gcc:11"
+  # Clang
   - "silkeh/clang:21"
+  - "silkeh/clang:20"
+  - "silkeh/clang:18"
+  - "silkeh/clang:16"
   # Latest available Intel compiler
-  - "intel/oneapi-basekit:2025.3.1-0-devel-ubuntu24.04"
+  - "intel/oneapi-basekit:2025.3.2-0-devel-ubuntu24.04"
+
+.newest_image: &newest_image "gcc:16"  # The newest GCC image from the list above
 
 variables:
   DEBIAN_FRONTEND: "noninteractive"
@@ -115,11 +119,9 @@ build:
   parallel:
     matrix:
       - IMAGE: *image_list
-      # One image is enough. The newest gcc image is selected.
-      - IMAGE: "gcc:15"
+      - IMAGE: *newest_image
         CMAKE_USE_DOUBLE_WEIGHT: "ON"
-      # One image is enough. The newest gcc image is selected.
-      - IMAGE: "gcc:15"
+      - IMAGE: *newest_image
         UPGRADE_PIP: "true"
   script: *build_script
   artifacts:
@@ -137,7 +139,6 @@ test:
   parallel:
     matrix:
       - IMAGE: *image_list
-      # One image is enough. The newest gcc image is selected.
-      - IMAGE: "gcc:15"
+      - IMAGE: *newest_image
         CMAKE_USE_DOUBLE_WEIGHT: "ON"
   script: *test_script
