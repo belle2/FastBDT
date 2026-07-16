@@ -26,7 +26,7 @@ jobs:
 
       - name: Configure, build and install
         # The venv must be active so CMake picks up the venv Python
-        # interpreter for the install-time pip step.
+        # interpreter for the install-time pip step
         run: |
           source venv/bin/activate
           cmake -S . -B build \
@@ -38,16 +38,23 @@ jobs:
           make -C build install
 
       - name: Verify Python bindings
-        # Run from /tmp so Python cannot accidentally import the
-        # package from the source tree
+        # Run from /tmp so Python cannot accidentally import the package
+        # from the source tree
         run: |
           source venv/bin/activate
-          cd /tmp && python3 -c "import PyFastBDT; print('PyFastBDT version:', PyFastBDT.__version__)"
+          cd /tmp
+          python3 -c "import PyFastBDT; print('PyFastBDT version:', PyFastBDT.__version__)"
+          python3 -c "import PyFastBDT.FastBDT as FastBDT; print('PyFastBDT uses float for weights:', FastBDT._is_weight_float)"
 
-      - name: Run unit tests
+      - name: Run C++ unit tests
         run: |
           export DYLD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$(brew --prefix)/lib
           ${{ github.workspace }}/install/bin/fastbdt-unittests
+
+      - name: Run Python unit tests
+        run: |
+          source venv/bin/activate
+          python3 -m pytest tests/test_python_interface.py
 
       - name: Run C++ example
         run: |
