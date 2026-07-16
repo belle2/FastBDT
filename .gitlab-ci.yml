@@ -80,13 +80,14 @@ default:
     if [[ "$UPGRADE_PIP" == "true" ]]; then
       pip install --upgrade pip setuptools wheel
     fi
-  - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE} && cd build/${SAFE_IMAGE}
+  - mkdir -p build/${SAFE_IMAGE} install/${SAFE_IMAGE}
   - |
-    cmake ${CI_PROJECT_DIR} \
+    cmake -S ${CI_PROJECT_DIR} -B build/${SAFE_IMAGE} \
       -DCMAKE_INSTALL_PREFIX=${CI_PROJECT_DIR}/install/${SAFE_IMAGE} \
-      -DUSE_DOUBLE_WEIGHT=${CMAKE_USE_DOUBLE_WEIGHT}
-  - make -j$(nproc)
-  - make -j$(nproc) install
+      -DUSE_DOUBLE_WEIGHT=${CMAKE_USE_DOUBLE_WEIGHT} \
+      -DPYTHON=$(which python3)
+  - cmake --build build/${SAFE_IMAGE} -j $(nproc)
+  - cmake --install build/${SAFE_IMAGE}
   # Run from /tmp so Python cannot accidentally import the package from the source tree
   - cd /tmp
   - python3 -c "import PyFastBDT;print('PyFastBDT version:', PyFastBDT.__version__)"

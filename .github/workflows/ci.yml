@@ -34,8 +34,8 @@ jobs:
             -DUSE_DOUBLE_WEIGHT=${{ env.CMAKE_USE_DOUBLE_WEIGHT }} \
             -DCMAKE_PREFIX_PATH=$(brew --prefix) \
             -DPYTHON=$(which python3)
-          make -C build -j$(sysctl -n hw.ncpu)
-          make -C build install
+          cmake --build build -j $(sysctl -n hw.ncpu)
+          cmake --install build
 
       - name: Verify Python bindings
         # Run from /tmp so Python cannot accidentally import the package
@@ -60,7 +60,7 @@ jobs:
         run: |
           cd examples
           ${CXX} IRISExample.cxx -o IRISExample -O3 \
-            -lFastBDT_static \
+            -l FastBDT_static \
             -L ${{ github.workspace }}/install/lib \
             -I ${{ github.workspace }}/install/include
           ./IRISExample iris.csv
