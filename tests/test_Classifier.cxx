@@ -248,6 +248,24 @@ TEST_F(ClassifierTest, BitwiseReproducibleTrainAndInference)
 }
 
 
+// Companion to the checksum guard above. That one catches any change to the
+// numerical output; this one catches the opposite failure, which no value-based
+// test can see: inference silently dropping off the optimised traversal in
+// Forest::GetF. Results stay correct, only speed regresses (tens of percent).
+//
+// A forest with many trees inevitably has some node that runs out of separating
+// cuts. Requiring every cut to be valid therefore used to disable the fast path
+// completely at the library default of 400 trees.
+TEST_F(ClassifierTest, TrainedForestUsesFastPath)
+{
+  for (unsigned int nTrees : {10u, 150u}) {
+    FastBDT::Classifier clf(nTrees, 3, std::vector<unsigned int>(4, 4));
+    clf.fit(X, y, w);
+    EXPECT_TRUE(clf.IsUniformFastPath()) << "nTrees=" << nTrees;
+  }
+}
+
+
 TEST_F(ClassifierTest, LoadAndSaveWorksWithPurityTransformation)
 {
   // The purity-transformation path stores cuts in bin-space (m_binned_forest).
