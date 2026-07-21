@@ -1731,6 +1731,28 @@ TEST_F(ForestFastPathTest, InvalidCutsDoNotDisableFastPath)
   EXPECT_TRUE(buildForest(400, 3, /*invalidNodeEvery=*/7).IsUniformFastPath());
 }
 
+TEST_F(ForestFastPathTest, TreeCountsCoverAllBlockWidths)
+{
+  // The traversal walks eight trees at a time, then four, then one. Cover
+  // every remainder so each block width - and the hand-over between them - is
+  // exercised, including forests smaller than a single block.
+  for (unsigned int nTrees = 1; nTrees <= 20; ++nTrees) {
+    SCOPED_TRACE("nTrees=" + std::to_string(nTrees));
+    auto forest = buildForest(nTrees, 3);
+    ASSERT_TRUE(forest.IsUniformFastPath());
+    expectMatchesReference(forest, makeEvents(80, 200 + nTrees));
+  }
+}
+
+TEST_F(ForestFastPathTest, TreeCountsWithInvalidCutsCoverAllBlockWidths)
+{
+  for (unsigned int nTrees = 1; nTrees <= 20; ++nTrees) {
+    SCOPED_TRACE("nTrees=" + std::to_string(nTrees));
+    auto forest = buildForest(nTrees, 3, /*invalidNodeEvery=*/2);
+    expectMatchesReference(forest, makeEvents(80, 300 + nTrees, /*withNaN=*/true));
+  }
+}
+
 TEST_F(ForestFastPathTest, NonUniformForestFallsBackAndMatchesReference)
 {
   // Mixed tree shapes disqualify the fast path; the general loop must then

@@ -1313,6 +1313,48 @@ namespace FastBDT {
       const unsigned int depth = m_uniformDepth;
 
       unsigned int t = 0;
+      // Eight independent node chains before four: each chain's
+      // load->compare->update is serial, so the only way to keep the load
+      // ports busy is to have several in flight at once. F is still summed
+      // strictly in tree order, so the result is unchanged.
+      for (; t + 8 <= nTrees; t += 8) {
+        const FastCut* const e0 = flatCuts + (t + 0) * nCuts;
+        const FastCut* const e1 = flatCuts + (t + 1) * nCuts;
+        const FastCut* const e2 = flatCuts + (t + 2) * nCuts;
+        const FastCut* const e3 = flatCuts + (t + 3) * nCuts;
+        const FastCut* const e4 = flatCuts + (t + 4) * nCuts;
+        const FastCut* const e5 = flatCuts + (t + 5) * nCuts;
+        const FastCut* const e6 = flatCuts + (t + 6) * nCuts;
+        const FastCut* const e7 = flatCuts + (t + 7) * nCuts;
+        unsigned int m0 = 1, m1 = 1, m2 = 1, m3 = 1, m4 = 1, m5 = 1, m6 = 1, m7 = 1;
+        for (unsigned int d = 0; d < depth; ++d) {
+          const FastCut& k0 = e0[m0 - 1];
+          const FastCut& k1 = e1[m1 - 1];
+          const FastCut& k2 = e2[m2 - 1];
+          const FastCut& k3 = e3[m3 - 1];
+          const FastCut& k4 = e4[m4 - 1];
+          const FastCut& k5 = e5[m5 - 1];
+          const FastCut& k6 = e6[m6 - 1];
+          const FastCut& k7 = e7[m7 - 1];
+          m0 = (m0 << 1) + static_cast<unsigned int>(values[k0.feature] >= k0.index);
+          m1 = (m1 << 1) + static_cast<unsigned int>(values[k1.feature] >= k1.index);
+          m2 = (m2 << 1) + static_cast<unsigned int>(values[k2.feature] >= k2.index);
+          m3 = (m3 << 1) + static_cast<unsigned int>(values[k3.feature] >= k3.index);
+          m4 = (m4 << 1) + static_cast<unsigned int>(values[k4.feature] >= k4.index);
+          m5 = (m5 << 1) + static_cast<unsigned int>(values[k5.feature] >= k5.index);
+          m6 = (m6 << 1) + static_cast<unsigned int>(values[k6.feature] >= k6.index);
+          m7 = (m7 << 1) + static_cast<unsigned int>(values[k7.feature] >= k7.index);
+        }
+        const Weight* const q = leafBoost + t * nLeaves;
+        F += q[m0 - nLeaves];
+        F += q[1 * nLeaves + (m1 - nLeaves)];
+        F += q[2 * nLeaves + (m2 - nLeaves)];
+        F += q[3 * nLeaves + (m3 - nLeaves)];
+        F += q[4 * nLeaves + (m4 - nLeaves)];
+        F += q[5 * nLeaves + (m5 - nLeaves)];
+        F += q[6 * nLeaves + (m6 - nLeaves)];
+        F += q[7 * nLeaves + (m7 - nLeaves)];
+      }
       for (; t + 4 <= nTrees; t += 4) {
         const FastCut* const c0 = flatCuts + (t + 0) * nCuts;
         const FastCut* const c1 = flatCuts + (t + 1) * nCuts;
