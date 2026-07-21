@@ -1753,6 +1753,33 @@ TEST_F(ForestFastPathTest, TreeCountsWithInvalidCutsCoverAllBlockWidths)
   }
 }
 
+TEST_F(ForestFastPathTest, AllDepthsMatchReference)
+{
+  // The traversal is instantiated per depth, with a runtime-shape fallback
+  // outside the specialised range. Every one of those instantiations has to
+  // give the same answer, so cover the whole specialised range and past its
+  // end, crossed with tree counts that reach each block width.
+  for (unsigned int depth = 1; depth <= 9; ++depth) {
+    for (unsigned int nTrees : {1u, 3u, 8u, 13u}) {
+      SCOPED_TRACE("depth=" + std::to_string(depth) + " nTrees=" + std::to_string(nTrees));
+      auto forest = buildForest(nTrees, depth);
+      ASSERT_TRUE(forest.IsUniformFastPath());
+      expectMatchesReference(forest, makeEvents(60, 100 + depth * 16 + nTrees));
+    }
+  }
+}
+
+TEST_F(ForestFastPathTest, AllDepthsWithInvalidCutsMatchReference)
+{
+  for (unsigned int depth = 1; depth <= 9; ++depth) {
+    for (unsigned int nTrees : {3u, 13u}) {
+      SCOPED_TRACE("depth=" + std::to_string(depth) + " nTrees=" + std::to_string(nTrees));
+      auto forest = buildForest(nTrees, depth, /*invalidNodeEvery=*/2);
+      expectMatchesReference(forest, makeEvents(60, 500 + depth * 16 + nTrees, /*withNaN=*/true));
+    }
+  }
+}
+
 TEST_F(ForestFastPathTest, NonUniformForestFallsBackAndMatchesReference)
 {
   // Mixed tree shapes disqualify the fast path; the general loop must then
