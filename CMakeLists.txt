@@ -9,7 +9,11 @@ set(FastBDT_VERSION_MINOR 6)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11 -Wall -Wextra -g")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -Wextra -g")
 
 option(USE_DOUBLE_WEIGHT "Use double precision (double) for Weight instead of single precision (float)" OFF)
 if(USE_DOUBLE_WEIGHT)
