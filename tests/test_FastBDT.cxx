@@ -1691,15 +1691,30 @@ protected:
   }
 
   /**
-   * Independent reference for Forest::GetF, expressed purely via
-   * Tree::ValueToNode: walk each tree, stopping early at an invalid cut or a
-   * NaN feature, and add that node's boost weight. Deliberately naive.
+   * Independent reference for Forest::GetF: descend each tree from the root,
+   * stopping early at an invalid cut or a NaN feature, and add the boost weight
+   * of the node stopped at.
+   *
+   * Deliberately spelled out rather than delegating to Tree::ValueToNode. The
+   * general traversal in GetF is itself written in terms of ValueToNode, so
+   * reusing it here would compare that implementation against itself and pass
+   * no matter how either behaved.
    */
   static double referenceGetF(const Forest<float>& forest, const std::vector<float>& values)
   {
     double F = forest.GetF0() / forest.GetShrinkage();
-    for (const auto& tree : forest.GetForest())
-      F += tree.GetBoostWeights()[tree.ValueToNode(values)];
+    for (const auto& tree : forest.GetForest()) {
+      const auto& cuts = tree.GetCuts();
+      unsigned int node = 1;
+      while (node <= cuts.size()) {
+        const Cut<float>& cut = cuts[node - 1];
+        if (not cut.valid) break;
+        const float value = values[cut.feature];
+        if (std::isnan(value)) break;
+        node = 2 * node + (value >= cut.index ? 1u : 0u);
+      }
+      F += tree.GetBoostWeights()[node - 1];
+    }
     return F * forest.GetShrinkage();
   }
 
