@@ -138,10 +138,11 @@ static FastBDT::Classifier makeClassifier(unsigned nFeatures,
 // Benchmark 1: Training time vs dataset size
 // ---------------------------------------------------------------------------
 
-static void benchmarkTraining(unsigned nRepeat)
+static void benchmarkTraining(unsigned nRepeat, unsigned nTrees)
 {
   const unsigned nFeatures = 10;
-  printHeader("Training  (nFeatures=10, nTrees=400, depth=3, nLevels=10)");
+  printHeader("Training  (nFeatures=10, nTrees=" + std::to_string(nTrees)
+              + ", depth=3, nLevels=10)");
 
   const std::vector<unsigned> sizes = {1000, 10000, 100000, 1000000};
 
@@ -154,7 +155,7 @@ static void benchmarkTraining(unsigned nRepeat)
     std::vector<double> times;
     times.reserve(nRepeat);
     for (unsigned rep = 0; rep < nRepeat; ++rep) {
-      auto clf = makeClassifier(nFeatures);
+      auto clf = makeClassifier(nFeatures, nTrees);
       auto t0 = Clock::now();
       clf.fit(X, y, w);
       auto t1 = Clock::now();
@@ -169,7 +170,7 @@ static void benchmarkTraining(unsigned nRepeat)
 // Benchmark 2: Inference throughput (events/second)
 // ---------------------------------------------------------------------------
 
-static void benchmarkInference(unsigned nRepeat)
+static void benchmarkInference(unsigned nRepeat, unsigned nTrees)
 {
   const unsigned nFeatures    = 10;
   const unsigned nTrainEvents = 100000;
@@ -179,7 +180,7 @@ static void benchmarkInference(unsigned nRepeat)
   std::vector<bool>               ytrain;
   std::vector<FastBDT::Weight>    wtrain;
   generateData(nTrainEvents, nFeatures, 42, Xtrain, ytrain, wtrain);
-  auto clf = makeClassifier(nFeatures);
+  auto clf = makeClassifier(nFeatures, nTrees);
   clf.fit(Xtrain, ytrain, wtrain);
 
   // The training data is no longer needed: let's release it
@@ -187,7 +188,8 @@ static void benchmarkInference(unsigned nRepeat)
   freeStorage(ytrain);
   freeStorage(wtrain);
 
-  printHeader("Inference (trained on 100k events, 10 features)");
+  printHeader("Inference (trained on 100k events, 10 features, "
+              + std::to_string(nTrees) + " trees)");
 
   const std::vector<unsigned> sizes = {1000, 10000, 100000, 1000000};
 
@@ -232,7 +234,7 @@ static void benchmarkInference(unsigned nRepeat)
 // Benchmark 3: Serialisation (save/load via stream)
 // ---------------------------------------------------------------------------
 
-static void benchmarkSerialisation(unsigned nRepeat)
+static void benchmarkSerialisation(unsigned nRepeat, unsigned nTrees)
 {
   const unsigned nFeatures    = 10;
   const unsigned nTrainEvents = 100000;
@@ -241,7 +243,7 @@ static void benchmarkSerialisation(unsigned nRepeat)
   std::vector<bool>               y;
   std::vector<FastBDT::Weight>    w;
   generateData(nTrainEvents, nFeatures, 42, X, y, w);
-  auto clf = makeClassifier(nFeatures);
+  auto clf = makeClassifier(nFeatures, nTrees);
   clf.fit(X, y, w);
 
   // Pre-serialise once to get the string for the load benchmark
@@ -249,7 +251,8 @@ static void benchmarkSerialisation(unsigned nRepeat)
   oss << clf;
   const std::string serialised = oss.str();
 
-  printHeader("Serialisation  (100k training events, 10 features, 400 trees)");
+  printHeader("Serialisation  (100k training events, 10 features, "
+              + std::to_string(nTrees) + " trees)");
 
   // Save
   {
@@ -290,34 +293,70 @@ static void benchmarkSerialisation(unsigned nRepeat)
 // Entry point
 // ---------------------------------------------------------------------------
 
+// Parses a strictly-numeric argument, throwing on trailing garbage.
+static long parseNumber(const char* arg)
+{
+  std::size_t pos = 0;
+  long value = std::stol(arg, &pos);
+  if (pos != std::strlen(arg)) {
+    throw std::invalid_argument("trailing characters");
+  }
+  return value;
+}
+
+// Parses a comma-separated list of tree counts, e.g. "100,400".
+static std::vector<unsigned> parseTreeList(const char* arg)
+{
+  std::vector<unsigned> result;
+  std::istringstream stream(arg);
+  std::string token;
+  while (std::getline(stream, token, ',')) {
+    long value = parseNumber(token.c_str());
+    if (value < 1 || value > 100000) {
+      throw std::out_of_range("nTrees must be between 1 and 100000");
+    }
+    result.push_back(static_cast<unsigned>(value));
+  }
+  if (result.empty()) {
+    throw std::invalid_argument("empty tree list");
+  }
+  return result;
+}
+
 int main(int argc, char* argv[])
 {
   unsigned nRepeat = 5;
+  std::vector<unsigned> treeCounts = {400};
 
-  if (argc >= 2) {
-    try {
-      std::size_t pos = 0;
-      long value = std::stol(argv[1], &pos);
-      if (pos != std::strlen(argv[1])) {
-        throw std::invalid_argument("trailing characters");
-      }
+  try {
+    if (argc >= 2) {
+      long value = parseNumber(argv[1]);
       if (value < 2 || value > 50) {
         std::cerr << "nRepeat must be between 2 and 50\n";
         return 1;
       }
       nRepeat = static_cast<unsigned>(value);
-    } catch (...) {
-      std::cerr << "Usage: " << argv[0] << " [2 <= nRepeat <= 50]\n";
-      return 1;
     }
+    if (argc >= 3) {
+      treeCounts = parseTreeList(argv[2]);
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "Usage: " << argv[0] << " [2 <= nRepeat <= 50] [nTrees[,nTrees...]]\n"
+              << "  e.g. " << argv[0] << " 5 100,400\n"
+              << "  (" << e.what() << ")\n";
+    return 1;
   }
 
-  std::cout << "FastBDT Benchmark  (nRepeat=" << nRepeat << ")\n";
+  for (unsigned nTrees : treeCounts) {
+    std::cout << "\nFastBDT Benchmark  (nRepeat=" << nRepeat
+              << ", nTrees=" << nTrees << ")\n";
 
-  benchmarkTraining(nRepeat);
-  benchmarkInference(nRepeat);
-  benchmarkSerialisation(nRepeat);
+    benchmarkTraining(nRepeat, nTrees);
+    benchmarkInference(nRepeat, nTrees);
+    benchmarkSerialisation(nRepeat, nTrees);
 
-  std::cout << "\n" << std::string(64, '=') << "\n";
+    std::cout << "\n" << std::string(64, '=') << "\n";
+  }
+
   return 0;
 }
