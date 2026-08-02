@@ -138,16 +138,28 @@ namespace FastBDT {
     const auto& flags = sample.GetFlags();
     const auto& weights = sample.GetWeights();
 
-    std::vector<Weight> bins(nNodes * nBinSums[nFeatures]);
+    const unsigned int nBinSumTotal = nBinSums[nFeatures];
+    const unsigned int* const binSums = nBinSums.data();
+    const int nNodesInt = static_cast<int>(nNodes);
 
-    // Fill Cut-PDFs for all nodes in this layer and for every feature
+    std::vector<Weight> bins(nNodes * nBinSumTotal);
+
+    // Fill Cut-PDFs for all nodes in this layer and for every feature.
+    // This loop is the single hottest part of training, so quantities that do
+    // not depend on the feature are hoisted out of the inner loop:
+    //  - the event weight (identical for every feature of an event)
+    //  - the per-node base offset into bins
+    //  - the pointer to the event's row of binned feature values
     for (unsigned int iEvent = firstEvent; iEvent < lastEvent; ++iEvent) {
-      if (flags.Get(iEvent) < static_cast<int>(nNodes))
+      const int flag = flags.Get(iEvent);
+      if (flag < nNodesInt)
         continue;
-      const unsigned int index = (flags.Get(iEvent) - nNodes) * nBinSums[nFeatures];
+      const Weight weight = weights.GetOriginalWeight(iEvent) *
+                            (weights.GetBoostWeight(iEvent) + weights.GetFlatnessWeight(iEvent));
+      Weight* const nodeBins = &bins[(flag - nNodesInt) * nBinSumTotal];
+      const unsigned int* const row = &values.Get(iEvent, 0);
       for (unsigned int iFeature = 0; iFeature < nFeatures; ++iFeature) {
-        const unsigned int subindex = nBinSums[iFeature] + values.Get(iEvent, iFeature);
-        bins[index + subindex] += weights.GetOriginalWeight(iEvent) * (weights.GetBoostWeight(iEvent) + weights.GetFlatnessWeight(iEvent));
+        nodeBins[binSums[iFeature] + row[iFeature]] += weight;
       }
     }
 

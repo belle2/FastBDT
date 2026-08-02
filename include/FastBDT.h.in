@@ -885,13 +885,20 @@ namespace FastBDT {
      */
     template<class Iterator> unsigned int ValueToNode(const Iterator& values) const
     {
+      // Hoist the vector size and data pointer out of the loop. This is the
+      // hottest function during inference; calling cuts.size() (a divide by
+      // sizeof(Cut)) and using bounds-checked cuts[] on every iteration
+      // otherwise dominates the loop's instruction count.
+      const Cut<T>* const cutData = cuts.data();
+      const unsigned int nCuts = cuts.size();
+
       // Start with a node 1. The node contains the position of the node
       // the event belongs to.
       unsigned int node = 1;
 
-      while (node <= cuts.size()) {
+      while (node <= nCuts) {
 
-        auto& cut = cuts[node - 1];
+        const Cut<T>& cut = cutData[node - 1];
         // Return current node if NaN
         if (not cut.valid)
           break;
