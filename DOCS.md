@@ -197,7 +197,7 @@ Every `Classifier` method has a direct counterpart here - `Fit`, `Predict`, `Pre
 
 ---
 
-### 7. Serialisation and weight files
+### 6. Serialisation and weight files
 
 A trained model is serialised to a plain-text **weight file** that stores the hyperparameters, the per-feature binnings, and the forest.
 Serialisation is available as `clf.save(path)` / `clf.load(path)` in Python, `operator<<` / the stream constructor in C++, and `Save` / `Load` in the C API.
@@ -207,10 +207,10 @@ Weight files are portable between the Python, C++ and C interfaces of a build wi
 
 ---
 
-### 8. Performance
+### 7. Performance
 
-Keeping FastBDT fast is a core project requirement - several tests in `src/test_Performance.cxx` assert that training time scales as expected, and `examples/Benchmark.cxx` measures training, inference, and (de)serialisation across dataset sizes.
-Running it before and after changes is a good way to catch regressions:
+Several tests in `tests/test_Performance.cxx` assert that training time scales as expected, and `examples/Benchmark.cxx` measures training, inference and (de)serialisation across dataset sizes.
+Running the benchmark before and after a change is a good way to catch regressions:
 
 ```bash
 g++ examples/Benchmark.cxx -o Benchmark -O3 -lFastBDT_static \
@@ -218,11 +218,11 @@ g++ examples/Benchmark.cxx -o Benchmark -O3 -lFastBDT_static \
 ./Benchmark            # optional: number of repetitions, e.g. ./Benchmark 5
 ```
 
-Inference uses a "fast forest" whose cuts are stored in float space and laid out contiguously, which keeps large forests cache-resident.
+For forests whose trees all have the same shape, inference walks a flattened copy of the cuts laid out contiguously, which keeps large forests cache-resident.
 
 ---
 
-### 9. Examples
+### 8. Examples
 
 You can find further examples under `examples/`:
 
