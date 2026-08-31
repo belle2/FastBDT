@@ -288,8 +288,8 @@ TEST_F(FeatureBinningTest, LowStatisticIsHandledCorrectly)
 
 TEST_F(FeatureBinningTest, OneLevelBinningWorks)
 {
-  // nLevels=1 was previously rejected as "< 2 levels" but is fully valid:
-  // one median cut produces 2 meaningful bins (+ 1 NaN bin = 3 total).
+  // nLevels=1 is valid: one median cut produces 2 meaningful bins
+  // (+ 1 NaN bin = 3 total).
   std::vector<float> data = {1.0f, 2.0f, 3.0f, 4.0f};
   FeatureBinning<float> fb(1u, data);
 
@@ -398,10 +398,8 @@ TEST_F(WeightedFeatureBinningTest, SameAsUsualBinningWithoutWeights)
 
 TEST_F(WeightedFeatureBinningTest, UnsortedInputGivesSameResultAsSortedInput)
 {
-  // With interleaved values like {1,2,1,2,...} the old distinct-value count
-  // compared consecutive pairs and over-counted, suppressing the equal-frequency
-  // fallback. After the fix the count is done on sorted input, so interleaved
-  // and sorted data with the same values produce identical binnings.
+  // The distinct-value count runs on sorted input, so interleaved data like
+  // {1,2,1,2,...} and the same values in sorted order produce identical binnings.
   std::vector<float>  sorted_data     = {1.0f, 1.0f, 1.0f, 2.0f, 2.0f, 2.0f};
   std::vector<float>  interleaved_data = {1.0f, 2.0f, 1.0f, 2.0f, 1.0f, 2.0f};
   std::vector<Weight> weights(6, 1.0f);
@@ -787,12 +785,9 @@ TEST_F(EventSampleTest, AddingEventsWithNANWeightsThrow)
 TEST_F(EventSampleTest, AddingEventsWithOutOfRangeBinThrows)
 {
 
-  // The fixture uses binning levels {8, 8, 8, 4}, so the number of bins per
-  // feature is {257, 257, 257, 17}. Valid bin indices are 0 .. nBins-1, i.e.
-  // the largest valid index for the last feature is 16.
-  //
-  // A bin index equal to nBins (here 17) is one past the last valid bin. If it
-  // were accepted it would cause an out-of-bounds write while filling the
+  // The fixture uses binning levels {8, 8, 8, 4}, so the bins per feature are
+  // {257, 257, 257, 17} and the largest valid index for the last feature is 16.
+  // An index equal to nBins would cause an out-of-bounds write while filling the
   // cumulative distributions, so AddEvent must reject it.
   EXPECT_NO_THROW(eventSample->AddEvent(std::vector<unsigned int>({256, 256, 256, 16}), 1.0, true));  // max valid bins
   EXPECT_THROW(eventSample->AddEvent(std::vector<unsigned int>({1, 2, 3, 17}), 1.0, true), std::runtime_error);   // == nBins
@@ -1610,17 +1605,14 @@ TEST_F(ForestTest, GetF)
 /**
  * Guards for the optimised traversal in Forest::GetF.
  *
- * GetF has a branch-free path (GetFFast) that walks four complete trees at a
+ * GetF has a branch-free path (GetFFast) that walks several complete trees at a
  * time over flattened, padded arrays. It is taken only for forests of uniform
  * shape and events without NaN; otherwise a general loop runs.
  *
- * Numerical drift in that path is already covered by the golden checksums in
+ * Numerical drift in that path is covered by the golden checksums in
  * ClassifierTest.BitwiseReproducibleTrainAndInference. What those cannot cover
  * is the fast path silently ceasing to *apply*: results stay correct and every
- * value-based test still passes, while inference quietly gets tens of percent
- * slower. That regression has happened - requiring every cut in the forest to
- * be valid disabled the fast path entirely as soon as one node ran out of
- * separating cuts, which is the normal case for forests with many trees.
+ * value-based test still passes, while inference gets tens of percent slower.
  */
 class ForestFastPathTest : public ::testing::Test {
 protected:
@@ -1737,9 +1729,8 @@ protected:
 
 TEST_F(ForestFastPathTest, InvalidCutsDoNotDisableFastPath)
 {
-  // An invalid cut anywhere in the forest used to disable the branch-free
-  // traversal for the whole forest. Results stayed correct, so nothing but an
-  // explicit check like this one can catch it.
+  // Invalid cuts must not disable the branch-free traversal for the whole forest.
+  // Results stay correct either way, so only an explicit check like this catches it.
   EXPECT_TRUE(buildForest(16, 3).IsUniformFastPath());
   EXPECT_TRUE(buildForest(16, 3, /*invalidNodeEvery=*/3).IsUniformFastPath());
   EXPECT_TRUE(buildForest(16, 3, /*invalidNodeEvery=*/1).IsUniformFastPath());

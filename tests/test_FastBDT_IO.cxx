@@ -144,16 +144,14 @@ TEST_F(IOTest, IOFeatureBinningFloat)
     EXPECT_FLOAT_EQ_NAN_SAFE(before_binning[i], after_binning[i]);
 }
 
-// Regression test for the uniqueify-on-deserialize bug: when the serialized
-// boundary-value array has fewer than GetNBins()-2 distinct values, the main
-// FeatureBinning constructor would re-trigger the "uniqueify" step and rebuild
-// the binary tree from a collapsed dataset, changing cut positions.
-// The PrecomputedTag constructor must bypass that step entirely.
+// Deserialisation must not re-run the "uniqueify" step: when the serialized
+// boundary-value array holds fewer than GetNBins()-2 distinct values, the main
+// FeatureBinning constructor rebuilds the binary tree from a collapsed dataset
+// and shifts the cut positions. The PrecomputedTag constructor bypasses it.
 //
 // Trigger condition: data clustered in the middle creates interior-duplicate
-// boundary values.  With {1,2,3,3,3,3,3,4,5} and nLevels=2 the 5 boundary
-// values hold only 3 distinct values (< GetNBins()-2 = 3 is exactly the
-// boundary, so use <=), causing uniqueify to fire and shift the root cut.
+// boundary values. With {1,2,3,3,3,3,3,4,5} and nLevels=2 the 5 boundary values
+// hold only 3 distinct values, exactly the threshold.
 TEST_F(IOTest, IOFeatureBinningWithDuplicateBoundaries)
 {
   std::vector<double> data = {1.0, 2.0, 3.0, 3.0, 3.0, 3.0, 3.0, 4.0, 5.0};

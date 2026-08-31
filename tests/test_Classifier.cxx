@@ -240,7 +240,6 @@ TEST_F(ClassifierTest, BitwiseReproducibleTrainAndInference)
         << "checksum drift for nTrees=" << c.nTrees << " depth=" << c.depth
         << " bin=" << c.bin << " shrinkage=" << c.shrinkage;
 
-    // Retraining with identical settings must reproduce the score bit-for-bit.
     FastBDT::Classifier reclf(c.nTrees, c.depth, binning, c.shrinkage);
     reclf.fit(X, y, w);
     EXPECT_EQ(checksum(reclf), score);
@@ -254,8 +253,7 @@ TEST_F(ClassifierTest, BitwiseReproducibleTrainAndInference)
 // Forest::GetF. Results stay correct, only speed regresses (tens of percent).
 //
 // A forest with many trees inevitably has some node that runs out of separating
-// cuts. Requiring every cut to be valid therefore used to disable the fast path
-// completely at the library default of 400 trees.
+// cuts, so the fast path must stay enabled when individual cuts are invalid.
 TEST_F(ClassifierTest, TrainedForestUsesFastPath)
 {
   for (unsigned int nTrees : {10u, 150u}) {
@@ -269,7 +267,6 @@ TEST_F(ClassifierTest, TrainedForestUsesFastPath)
 TEST_F(ClassifierTest, LoadAndSaveWorksWithPurityTransformation)
 {
   // The purity-transformation path stores cuts in bin-space (m_binned_forest).
-  // Verify that the serialisation round-trip preserves the score exactly.
   FastBDT::Classifier classifier(10, 3, {4, 4, 4, 4});
   classifier.SetPurityTransformation({true, false, false, false});
   classifier.fit(X, y, w);
@@ -304,10 +301,9 @@ TEST_F(ClassifierTest, FitCalledTwiceWithoutPurityTransformationSucceeds)
 
 TEST_F(ClassifierTest, FitCalledTwiceOnDifferentDataGivesSameResultAsFreshFit)
 {
-  // Re-fitting a Classifier on different data must give the same predictions as
-  // a fresh Classifier fitted on that data. This tests that m_featureBinning is
-  // cleared before each fit: without the clear(), resize() after push_back() would
-  // keep the old entries (from the previous fit) instead of the newly computed ones.
+  // Re-fitting a Classifier on different data must give the same predictions as a
+  // fresh Classifier fitted on that data, i.e. m_featureBinning is cleared before
+  // each fit rather than retaining the previous fit's entries.
   const unsigned int half = 75;
   std::vector<std::vector<float>> X_half(4);
   for (unsigned int f = 0; f < 4; ++f)
