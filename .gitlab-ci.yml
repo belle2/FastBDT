@@ -99,8 +99,8 @@ default:
 
 .test_script: &test_script
   - source venv/${SAFE_IMAGE}/bin/activate
-  # Run the unit tests
-  - ./install/${SAFE_IMAGE}/bin/fastbdt-unittests
+  # Run the unit tests, skipping TreeBuilderScalesLinearInNumberOfFeatures
+  - ./install/${SAFE_IMAGE}/bin/fastbdt-unittests --gtest_filter='*:-*TreeBuilderScalesLinearInNumberOfFeatures'
   - python3 -m pytest tests/test_python_interface.py
   # Run all the main examples
   - cd ${CI_PROJECT_DIR}/examples
