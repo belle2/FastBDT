@@ -1292,14 +1292,31 @@ namespace FastBDT {
 
   private:
     /**
+     * Shape of a uniform forest, supplied to GetFFastImpl either as
+     * compile-time constants (StaticShape) or as runtime values
+     * (RuntimeShape). Passing it as a type lets the same traversal be compiled
+     * both ways.
+     */
+    template<unsigned int D>
+    struct StaticShape {
+      static constexpr unsigned int depth = D;
+      static constexpr unsigned int nCuts = (1u << D) - 1;
+      static constexpr unsigned int nLeaves = 1u << D;
+    };
+
+    struct RuntimeShape {
+      unsigned int depth, nCuts, nLeaves;
+    };
+
+    /**
      * Traversal used by GetF when m_fastPathOk holds and the event has no NaN
      * feature (both checked by the caller). Walks four complete trees at a
      * time without any per-node validity/NaN checks; the leaf boost weights
      * are then added to F strictly in tree order, keeping the floating-point
      * result bit-identical to the general loop in GetF.
      */
-    template<class Iterator>
-    double GetFFast(const Iterator& values) const
+    template<class Shape, class Iterator>
+    double GetFFastImpl(const Iterator& values, const Shape sh) const
     {
       double F = F0_div_shrink;
 
@@ -1308,9 +1325,9 @@ namespace FastBDT {
       const FastCut* const flatCuts = m_allCutsValid ? m_flatCuts.data() : m_fastCuts.data();
       const Weight* const leafBoost = m_flatLeafBoost.data();
       const unsigned int nTrees = static_cast<unsigned int>(m_cutOffsets.size()) - 1;
-      const unsigned int nCuts = m_uniformNCuts;
-      const unsigned int nLeaves = nCuts + 1;
-      const unsigned int depth = m_uniformDepth;
+      const unsigned int nCuts = sh.nCuts;
+      const unsigned int nLeaves = sh.nLeaves;
+      const unsigned int depth = sh.depth;
 
       unsigned int t = 0;
       // Eight independent node chains before four: each chain's
@@ -1391,6 +1408,29 @@ namespace FastBDT {
       }
 
       return F * shrinkage;
+    }
+
+    /**
+     * Selects a traversal instantiation for the forest's depth. The depth
+     * itself comes from the weightfile and is read at runtime; only the body
+     * is specialised, so within one instantiation the cut count is a constant
+     * and each tree's base address folds into an addressing mode instead of
+     * occupying a register. Depths outside the specialised range use an
+     * instantiation carrying the shape as ordinary runtime values.
+     */
+    template<class Iterator>
+    double GetFFast(const Iterator& values) const
+    {
+      switch (m_uniformDepth) {
+        case 1: return GetFFastImpl(values, StaticShape<1>{});
+        case 2: return GetFFastImpl(values, StaticShape<2>{});
+        case 3: return GetFFastImpl(values, StaticShape<3>{});
+        case 4: return GetFFastImpl(values, StaticShape<4>{});
+        case 5: return GetFFastImpl(values, StaticShape<5>{});
+        case 6: return GetFFastImpl(values, StaticShape<6>{});
+        default:
+          return GetFFastImpl(values, RuntimeShape{m_uniformDepth, m_uniformNCuts, m_uniformNCuts + 1});
+      }
     }
 
     // Cache-dense cut used only for inference (GetF). Holds just the fields the
