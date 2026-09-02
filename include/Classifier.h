@@ -92,6 +92,12 @@ namespace FastBDT {
 
     void fit(const std::vector<std::vector<float>>& X, const std::vector<bool>& y, const std::vector<Weight>& w);
 
+    /**
+     * Whether inference uses the branch-free traversal (see
+     * Forest::IsUniformFastPath). Diagnostic only.
+     */
+    bool IsUniformFastPath() const { return m_can_use_fast_forest and m_fast_forest.IsUniformFastPath(); }
+
     float predict(const std::vector<float>& X) const;
 
     // Pointer overload: X must point to at least GetNFeatures() contiguous

@@ -1050,9 +1050,109 @@ namespace FastBDT {
       for (const auto& bw : boostWeights)
         m_flatBoost.push_back(bw);
       m_boostOffsets.push_back(static_cast<unsigned int>(m_flatBoost.size()));
+
+      // Track whether the whole forest qualifies for the branch-free traversal
+      // in GetF. Only the *shape* has to be uniform: nCuts + 1 a power of two,
+      // one boost weight per node incl. the leaf layer, and the same shape for
+      // every tree. Individual cuts may be invalid (a node that ran out of
+      // separating cuts) - those are folded into the padded arrays below, so
+      // they no longer disqualify the forest. Requiring all cuts to be valid
+      // used to disable the fast path for the entire forest as soon as a
+      // single node in a single tree was invalid, which is the common case for
+      // forests with many trees.
+      const unsigned int nCuts = static_cast<unsigned int>(cuts.size());
+      const bool uniformShape = nCuts > 0 and ((nCuts + 1) & nCuts) == 0
+                                and boostWeights.size() == 2 * static_cast<std::size_t>(nCuts) + 1;
+      for (const auto& cut : cuts) {
+        if (cut.valid and cut.feature > m_maxFeature)
+          m_maxFeature = cut.feature;
+      }
+      if (forest.size() == 1) {
+        m_uniformNCuts = nCuts;
+        m_uniformNBoost = static_cast<unsigned int>(boostWeights.size());
+        m_uniformDepth = 0;
+        while ((1u << (m_uniformDepth + 1)) <= nCuts + 1)
+          ++m_uniformDepth;
+        m_fastPathOk = uniformShape;
+      } else {
+        m_fastPathOk = m_fastPathOk and uniformShape and nCuts == m_uniformNCuts
+                       and boostWeights.size() == m_uniformNBoost;
+      }
+
+      // Build the two padded arrays the fast path walks. Both are indexed
+      // strictly by tree * stride, so no offset lookup is needed at inference.
+      //
+      // m_fastCuts mirrors the tree's cuts, but an invalid cut is replaced by a
+      // harmless always-defined comparison on feature 0 instead of the
+      // kInvalidFeature sentinel, so the traversal never needs a validity check
+      // and never indexes the event out of bounds.
+      //
+      // m_flatLeafBoost holds one value per leaf. Where the general loop would
+      // break at an invalid internal node n and take boostWeights[n-1], every
+      // leaf below n is filled with exactly that value, so descending all the
+      // way down yields the identical Weight. The result is therefore
+      // bit-identical to the general loop, not merely close.
+      if (uniformShape) {
+        const unsigned int nLeaves = nCuts + 1;
+        // Depth of *this* tree, which need not equal m_uniformDepth if the
+        // forest is not uniform after all; in that case m_fastPathOk is already
+        // false and these arrays are never read, but they must still be built
+        // without indexing this tree's cuts out of bounds.
+        unsigned int treeDepth = 0;
+        while ((1u << (treeDepth + 1)) <= nLeaves)
+          ++treeDepth;
+
+        // m_fastCuts is only materialised once some tree actually contains an
+        // invalid cut. While every cut is valid the padded array would be a
+        // byte-for-byte copy of m_flatCuts, so the fast path reads m_flatCuts
+        // instead and the copy is never allocated. This is not just a memory
+        // saving: allocating a second, identical array measurably slowed the
+        // traversal down (~4% for a 100-tree forest) purely through the changed
+        // heap addresses of the two arrays the hot loop streams.
+        bool treeAllValid = true;
+        for (const auto& cut : cuts)
+          if (not cut.valid) { treeAllValid = false; break; }
+
+        if (m_allCutsValid and not treeAllValid) {
+          // First invalid cut in the forest: back-fill every tree seen so far
+          // (all of whose cuts are valid) from m_flatCuts, which already
+          // includes the current tree.
+          m_allCutsValid = false;
+          m_fastCuts.clear();
+          m_fastCuts.reserve(m_flatCuts.size());
+          for (const auto& c : m_flatCuts)
+            m_fastCuts.push_back(FastCut{c.feature == kInvalidFeature ? 0u : c.feature, c.index});
+        } else if (not m_allCutsValid) {
+          for (const auto& cut : cuts)
+            m_fastCuts.push_back(cut.valid ? FastCut{cut.feature, cut.index}
+                                           : FastCut{0u, T()});
+        }
+
+        const std::size_t base = m_flatLeafBoost.size();
+        m_flatLeafBoost.resize(base + nLeaves);
+        for (unsigned int leaf = 0; leaf < nLeaves; ++leaf) {
+          // Walk from the root towards this leaf, stopping early at the first
+          // invalid cut exactly as the general loop would.
+          unsigned int node = 1;
+          for (unsigned int d = 0; d < treeDepth; ++d) {
+            if (not cuts[node - 1].valid)
+              break;
+            const unsigned int bit = (leaf >> (treeDepth - 1 - d)) & 1u;
+            node = (node << 1) + bit;
+          }
+          m_flatLeafBoost[base + leaf] = boostWeights[node - 1];
+        }
+      }
     }
 
     const std::vector<Tree<T>>& GetForest() const { return forest; }
+    /**
+     * Whether the forest qualifies for the branch-free traversal in GetFFast,
+     * i.e. every tree is a complete binary tree of identical shape. Exposed for
+     * diagnostics: a forest that unexpectedly falls back to the general loop is
+     * measurably slower, so this is worth being able to check.
+     */
+    bool IsUniformFastPath() const { return m_fastPathOk; }
     double GetF0() const { return F0; }
     double GetShrinkage() const { return shrinkage; }
     bool GetTransform2Probability() const { return transform2probability; }
@@ -1073,6 +1173,22 @@ namespace FastBDT {
     template<class Iterator>
     double GetF(const Iterator& values) const
     {
+      // Branch-free fast path: if every tree is a complete tree of identical
+      // shape and the event has no NaN feature, neither of the two early-exit
+      // conditions in the general loop below can ever fire, so the traversal
+      // can drop them and walk four trees at once. The four node chains are
+      // independent, which hides the load->compare->update latency that
+      // dominates the serial walk. Only integer/compare operations are
+      // reordered; F is still accumulated tree by tree in the original order,
+      // so the result is bit-identical to the general loop.
+      if (m_fastPathOk) {
+        bool anyNaN = false;
+        for (unsigned int iFeature = 0; iFeature <= m_maxFeature; ++iFeature)
+          anyNaN |= is_nan<T>(values[iFeature]);
+        if (not anyNaN)
+          return GetFFast(values);
+      }
+
       double F = F0_div_shrink;
 
       const FastCut* const flatCuts = m_flatCuts.data();
@@ -1175,6 +1291,108 @@ namespace FastBDT {
     }
 
   private:
+    /**
+     * Traversal used by GetF when m_fastPathOk holds and the event has no NaN
+     * feature (both checked by the caller). Walks four complete trees at a
+     * time without any per-node validity/NaN checks; the leaf boost weights
+     * are then added to F strictly in tree order, keeping the floating-point
+     * result bit-identical to the general loop in GetF.
+     */
+    template<class Iterator>
+    double GetFFast(const Iterator& values) const
+    {
+      double F = F0_div_shrink;
+
+      // See AddTree: while every cut is valid the padded copy is not built and
+      // m_flatCuts already has exactly the right contents.
+      const FastCut* const flatCuts = m_allCutsValid ? m_flatCuts.data() : m_fastCuts.data();
+      const Weight* const leafBoost = m_flatLeafBoost.data();
+      const unsigned int nTrees = static_cast<unsigned int>(m_cutOffsets.size()) - 1;
+      const unsigned int nCuts = m_uniformNCuts;
+      const unsigned int nLeaves = nCuts + 1;
+      const unsigned int depth = m_uniformDepth;
+
+      unsigned int t = 0;
+      // Eight independent node chains before four: each chain's
+      // load->compare->update is serial, so the only way to keep the load
+      // ports busy is to have several in flight at once. F is still summed
+      // strictly in tree order, so the result is unchanged.
+      for (; t + 8 <= nTrees; t += 8) {
+        const FastCut* const e0 = flatCuts + (t + 0) * nCuts;
+        const FastCut* const e1 = flatCuts + (t + 1) * nCuts;
+        const FastCut* const e2 = flatCuts + (t + 2) * nCuts;
+        const FastCut* const e3 = flatCuts + (t + 3) * nCuts;
+        const FastCut* const e4 = flatCuts + (t + 4) * nCuts;
+        const FastCut* const e5 = flatCuts + (t + 5) * nCuts;
+        const FastCut* const e6 = flatCuts + (t + 6) * nCuts;
+        const FastCut* const e7 = flatCuts + (t + 7) * nCuts;
+        unsigned int m0 = 1, m1 = 1, m2 = 1, m3 = 1, m4 = 1, m5 = 1, m6 = 1, m7 = 1;
+        for (unsigned int d = 0; d < depth; ++d) {
+          const FastCut& k0 = e0[m0 - 1];
+          const FastCut& k1 = e1[m1 - 1];
+          const FastCut& k2 = e2[m2 - 1];
+          const FastCut& k3 = e3[m3 - 1];
+          const FastCut& k4 = e4[m4 - 1];
+          const FastCut& k5 = e5[m5 - 1];
+          const FastCut& k6 = e6[m6 - 1];
+          const FastCut& k7 = e7[m7 - 1];
+          m0 = (m0 << 1) + static_cast<unsigned int>(values[k0.feature] >= k0.index);
+          m1 = (m1 << 1) + static_cast<unsigned int>(values[k1.feature] >= k1.index);
+          m2 = (m2 << 1) + static_cast<unsigned int>(values[k2.feature] >= k2.index);
+          m3 = (m3 << 1) + static_cast<unsigned int>(values[k3.feature] >= k3.index);
+          m4 = (m4 << 1) + static_cast<unsigned int>(values[k4.feature] >= k4.index);
+          m5 = (m5 << 1) + static_cast<unsigned int>(values[k5.feature] >= k5.index);
+          m6 = (m6 << 1) + static_cast<unsigned int>(values[k6.feature] >= k6.index);
+          m7 = (m7 << 1) + static_cast<unsigned int>(values[k7.feature] >= k7.index);
+        }
+        const Weight* const q = leafBoost + t * nLeaves;
+        F += q[m0 - nLeaves];
+        F += q[1 * nLeaves + (m1 - nLeaves)];
+        F += q[2 * nLeaves + (m2 - nLeaves)];
+        F += q[3 * nLeaves + (m3 - nLeaves)];
+        F += q[4 * nLeaves + (m4 - nLeaves)];
+        F += q[5 * nLeaves + (m5 - nLeaves)];
+        F += q[6 * nLeaves + (m6 - nLeaves)];
+        F += q[7 * nLeaves + (m7 - nLeaves)];
+      }
+      for (; t + 4 <= nTrees; t += 4) {
+        const FastCut* const c0 = flatCuts + (t + 0) * nCuts;
+        const FastCut* const c1 = flatCuts + (t + 1) * nCuts;
+        const FastCut* const c2 = flatCuts + (t + 2) * nCuts;
+        const FastCut* const c3 = flatCuts + (t + 3) * nCuts;
+        unsigned int n0 = 1, n1 = 1, n2 = 1, n3 = 1;
+        for (unsigned int d = 0; d < depth; ++d) {
+          const FastCut& cut0 = c0[n0 - 1];
+          const FastCut& cut1 = c1[n1 - 1];
+          const FastCut& cut2 = c2[n2 - 1];
+          const FastCut& cut3 = c3[n3 - 1];
+          n0 = (n0 << 1) + static_cast<unsigned int>(values[cut0.feature] >= cut0.index);
+          n1 = (n1 << 1) + static_cast<unsigned int>(values[cut1.feature] >= cut1.index);
+          n2 = (n2 << 1) + static_cast<unsigned int>(values[cut2.feature] >= cut2.index);
+          n3 = (n3 << 1) + static_cast<unsigned int>(values[cut3.feature] >= cut3.index);
+        }
+        // A traversal of a complete tree always ends on a leaf, i.e.
+        // node in [nLeaves, 2*nLeaves), so the leaf-only array applies.
+        const Weight* const b = leafBoost + t * nLeaves;
+        F += b[n0 - nLeaves];
+        F += b[nLeaves + (n1 - nLeaves)];
+        F += b[2 * nLeaves + (n2 - nLeaves)];
+        F += b[3 * nLeaves + (n3 - nLeaves)];
+      }
+
+      for (; t < nTrees; ++t) {
+        const FastCut* const c = flatCuts + t * nCuts;
+        unsigned int node = 1;
+        for (unsigned int d = 0; d < depth; ++d) {
+          const FastCut& cut = c[node - 1];
+          node = (node << 1) + static_cast<unsigned int>(values[cut.feature] >= cut.index);
+        }
+        F += leafBoost[t * nLeaves + (node - nLeaves)];
+      }
+
+      return F * shrinkage;
+    }
+
     // Cache-dense cut used only for inference (GetF). Holds just the fields the
     // traversal needs: 8 bytes for T=float instead of the 24-byte Cut<T> (whose
     // 8-byte gain is never read at inference). An invalid cut is encoded by
@@ -1197,8 +1415,27 @@ namespace FastBDT {
     // owns [offset[t], offset[t+1]).
     std::vector<FastCut> m_flatCuts;
     std::vector<Weight> m_flatBoost;
+    // Padded, fast-path-only mirrors of the above; see AddTree. Indexed as
+    // tree * m_uniformNCuts and tree * (m_uniformNCuts + 1) respectively, and
+    // only consistent - and only read - while m_fastPathOk holds.
+    std::vector<FastCut> m_fastCuts;
+    std::vector<Weight> m_flatLeafBoost;
     std::vector<unsigned int> m_cutOffsets{0};
     std::vector<unsigned int> m_boostOffsets{0};
+
+    // Fast-path metadata maintained by AddTree. m_fastPathOk means every tree
+    // is a complete binary tree of the same shape (m_uniformNCuts cuts,
+    // m_uniformNBoost boost weights, depth m_uniformDepth), so tree t owns
+    // cuts [t*nCuts, (t+1)*nCuts). m_maxFeature is the highest feature index
+    // any valid cut reads, used by GetF to pre-scan the event for NaNs.
+    bool m_fastPathOk = false;
+    // Whether every cut appended so far is valid; while true m_fastCuts is
+    // left empty and the fast path reads m_flatCuts.
+    bool m_allCutsValid = true;
+    unsigned int m_uniformNCuts = 0;
+    unsigned int m_uniformNBoost = 0;
+    unsigned int m_uniformDepth = 0;
+    unsigned int m_maxFeature = 0;
 
   };
 

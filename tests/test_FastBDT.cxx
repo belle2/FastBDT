@@ -8,6 +8,7 @@
 
 #include <sstream>
 #include <limits>
+#include <random>
 
 using namespace FastBDT;
 
@@ -1603,6 +1604,183 @@ TEST_F(ForestTest, GetF)
   forest->AddTree(*tree);
   EXPECT_FLOAT_EQ(forest->GetF(values), 1.8);
 
+}
+
+
+/**
+ * Guards for the optimised traversal in Forest::GetF.
+ *
+ * GetF has a branch-free path (GetFFast) that walks four complete trees at a
+ * time over flattened, padded arrays. It is taken only for forests of uniform
+ * shape and events without NaN; otherwise a general loop runs.
+ *
+ * Numerical drift in that path is already covered by the golden checksums in
+ * ClassifierTest.BitwiseReproducibleTrainAndInference. What those cannot cover
+ * is the fast path silently ceasing to *apply*: results stay correct and every
+ * value-based test still passes, while inference quietly gets tens of percent
+ * slower. That regression has happened - requiring every cut in the forest to
+ * be valid disabled the fast path entirely as soon as one node ran out of
+ * separating cuts, which is the normal case for forests with many trees.
+ */
+class ForestFastPathTest : public ::testing::Test {
+protected:
+  static const unsigned int nFeatures = 6;
+
+  static Cut<float> makeCut(unsigned int feature, float index, bool valid)
+  {
+    Cut<float> cut;
+    cut.feature = feature;
+    cut.index = index;
+    cut.gain = 1.0;
+    cut.valid = valid;
+    return cut;
+  }
+
+  /**
+   * Builds a complete tree of the given depth. `invalidNode` optionally marks
+   * one internal node (1-based, as in the traversal) invalid, which makes the
+   * walk stop there and take that node's boost weight.
+   */
+  static Tree<float> makeTree(unsigned int depth, unsigned int seed, unsigned int invalidNode = 0)
+  {
+    const unsigned int nCuts = (1u << depth) - 1;
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> threshold(-1.0f, 1.0f);
+
+    std::vector<Cut<float>> cuts;
+    for (unsigned int node = 1; node <= nCuts; ++node)
+      cuts.push_back(makeCut(rng() % nFeatures, threshold(rng), node != invalidNode));
+
+    // One boost weight per node, internal nodes included.
+    const std::size_t nNodes = 2 * static_cast<std::size_t>(nCuts) + 1;
+    std::vector<Weight> boostWeights(nNodes);
+    for (std::size_t i = 0; i < nNodes; ++i)
+      boostWeights[i] = static_cast<Weight>(threshold(rng));
+
+    std::vector<Weight> nEntries(nNodes, static_cast<Weight>(10));
+    std::vector<Weight> purities(nNodes, static_cast<Weight>(0.5));
+    return Tree<float>(cuts, nEntries, purities, boostWeights);
+  }
+
+  static Forest<float> buildForest(unsigned int nTrees, unsigned int depth,
+                                   unsigned int invalidNodeEvery = 0)
+  {
+    Forest<float> forest(0.1, 0.5, false);
+    for (unsigned int t = 0; t < nTrees; ++t) {
+      unsigned int invalidNode = 0;
+      if (invalidNodeEvery != 0 and (t % invalidNodeEvery == 0))
+        invalidNode = 1 + (t % ((1u << depth) - 1));
+      forest.AddTree(makeTree(depth, 1000 + t, invalidNode));
+    }
+    return forest;
+  }
+
+  static std::vector<std::vector<float>> makeEvents(unsigned int nEvents, unsigned int seed,
+                                                    bool withNaN = false)
+  {
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> value(-1.5f, 1.5f);
+    std::vector<std::vector<float>> events;
+    for (unsigned int i = 0; i < nEvents; ++i) {
+      std::vector<float> row(nFeatures);
+      for (unsigned int f = 0; f < nFeatures; ++f) row[f] = value(rng);
+      if (withNaN and (i % 3 == 0)) row[i % nFeatures] = NAN;
+      events.push_back(row);
+    }
+    return events;
+  }
+
+  /**
+   * Independent reference for Forest::GetF, expressed purely via
+   * Tree::ValueToNode: walk each tree, stopping early at an invalid cut or a
+   * NaN feature, and add that node's boost weight. Deliberately naive.
+   */
+  static double referenceGetF(const Forest<float>& forest, const std::vector<float>& values)
+  {
+    double F = forest.GetF0() / forest.GetShrinkage();
+    for (const auto& tree : forest.GetForest())
+      F += tree.GetBoostWeights()[tree.ValueToNode(values)];
+    return F * forest.GetShrinkage();
+  }
+
+  /** Asserts GetF is bit-to-bit identical to the reference for every event. */
+  static void expectMatchesReference(const Forest<float>& forest,
+                                     const std::vector<std::vector<float>>& events)
+  {
+    for (std::size_t i = 0; i < events.size(); ++i) {
+      const double expected = referenceGetF(forest, events[i]);
+      const double actual = forest.GetF(events[i]);
+      if (std::isnan(expected)) {
+        EXPECT_TRUE(std::isnan(actual)) << "event " << i;
+      } else {
+        // Exact equality on purpose: the fast path claims bit-to-bit identity.
+        EXPECT_EQ(expected, actual) << "event " << i;
+      }
+    }
+  }
+};
+
+TEST_F(ForestFastPathTest, InvalidCutsDoNotDisableFastPath)
+{
+  // An invalid cut anywhere in the forest used to disable the branch-free
+  // traversal for the whole forest. Results stayed correct, so nothing but an
+  // explicit check like this one can catch it.
+  EXPECT_TRUE(buildForest(16, 3).IsUniformFastPath());
+  EXPECT_TRUE(buildForest(16, 3, /*invalidNodeEvery=*/3).IsUniformFastPath());
+  EXPECT_TRUE(buildForest(16, 3, /*invalidNodeEvery=*/1).IsUniformFastPath());
+  EXPECT_TRUE(buildForest(400, 3, /*invalidNodeEvery=*/7).IsUniformFastPath());
+}
+
+TEST_F(ForestFastPathTest, TreeCountsCoverAllBlockWidths)
+{
+  // The traversal walks eight trees at a time, then four, then one. Cover
+  // every remainder so each block width - and the hand-over between them - is
+  // exercised, including forests smaller than a single block.
+  for (unsigned int nTrees = 1; nTrees <= 20; ++nTrees) {
+    SCOPED_TRACE("nTrees=" + std::to_string(nTrees));
+    auto forest = buildForest(nTrees, 3);
+    ASSERT_TRUE(forest.IsUniformFastPath());
+    expectMatchesReference(forest, makeEvents(80, 200 + nTrees));
+  }
+}
+
+TEST_F(ForestFastPathTest, TreeCountsWithInvalidCutsCoverAllBlockWidths)
+{
+  for (unsigned int nTrees = 1; nTrees <= 20; ++nTrees) {
+    SCOPED_TRACE("nTrees=" + std::to_string(nTrees));
+    auto forest = buildForest(nTrees, 3, /*invalidNodeEvery=*/2);
+    expectMatchesReference(forest, makeEvents(80, 300 + nTrees, /*withNaN=*/true));
+  }
+}
+
+TEST_F(ForestFastPathTest, NonUniformForestFallsBackAndMatchesReference)
+{
+  // Mixed tree shapes disqualify the fast path; the general loop must then
+  // still produce the correct answer, including for NaN events.
+  Forest<float> forest(0.1, 0.5, false);
+  forest.AddTree(makeTree(3, 1));
+  forest.AddTree(makeTree(2, 2));
+  forest.AddTree(makeTree(4, 3));
+  EXPECT_FALSE(forest.IsUniformFastPath());
+  expectMatchesReference(forest, makeEvents(200, 70, /*withNaN=*/true));
+}
+
+TEST_F(ForestFastPathTest, CopiedForestMatchesReference)
+{
+  // Forest has defaulted copy/assign. Any state cached for the fast path must
+  // survive a copy - a cached raw pointer, for instance, would dangle into the
+  // source object's vectors here.
+  auto original = buildForest(16, 3, /*invalidNodeEvery=*/3);
+  const auto events = makeEvents(200, 90, /*withNaN=*/true);
+
+  Forest<float> copied = original;
+  Forest<float> assigned(0.1, 0.5, false);
+  assigned = original;
+
+  EXPECT_TRUE(copied.IsUniformFastPath());
+  EXPECT_TRUE(assigned.IsUniformFastPath());
+  expectMatchesReference(copied, events);
+  expectMatchesReference(assigned, events);
 }
 
 
