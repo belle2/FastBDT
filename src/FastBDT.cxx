@@ -58,10 +58,9 @@ namespace FastBDT {
                                  features.size()) + " vs " + std::to_string(nFeatures) + " + " + std::to_string(nSpectators));
     }
 
-    // Check if the feature values are in the correct range. Valid bin indices
-    // are 0 .. nBins-1 (bin 0 is the NaN bin, 1..2^nLevels the ordinary bins);
-    // a value equal to nBins is one past the last valid bin and would later
-    // cause an out-of-bounds write in CumulativeDistributions::CalculateCDFs.
+    // Valid bin indices are 0 .. nBins-1 (bin 0 is the NaN bin, 1..2^nLevels the
+    // ordinary bins). An index equal to nBins causes an out-of-bounds write in
+    // CumulativeDistributions::CalculateCDFs.
     for (unsigned int iFeature = 0; iFeature < nFeatures + nSpectators; ++iFeature) {
       if (features[iFeature] >= nBins[iFeature])
         throw std::runtime_error(std::string("Promised number of bins is violated. ") + std::to_string(
@@ -144,12 +143,9 @@ namespace FastBDT {
 
     std::vector<Weight> bins(nNodes * nBinSumTotal);
 
-    // Fill Cut-PDFs for all nodes in this layer and for every feature.
-    // This loop is the single hottest part of training, so quantities that do
-    // not depend on the feature are hoisted out of the inner loop:
-    //  - the event weight (identical for every feature of an event)
-    //  - the per-node base offset into bins
-    //  - the pointer to the event's row of binned feature values
+    // Fill Cut-PDFs for all nodes in this layer and for every feature. This is the
+    // hottest loop in training, so the feature-independent quantities (event
+    // weight, per-node base offset, pointer to the event's row) are hoisted out.
     for (unsigned int iEvent = firstEvent; iEvent < lastEvent; ++iEvent) {
       const int flag = flags.Get(iEvent);
       if (flag < nNodesInt)

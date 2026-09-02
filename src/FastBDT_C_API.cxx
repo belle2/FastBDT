@@ -170,7 +170,6 @@ extern "C" {
   {
     Expertise* expertise = reinterpret_cast<Expertise*>(ptr);
     unsigned int nFeatures = expertise->classifier.GetNFeatures();
-    // Use the pointer overload so we do not allocate a std::vector per event.
     for (unsigned int iEvent = 0; iEvent < nEvents; ++iEvent) {
       result[iEvent] = expertise->classifier.predict(array + iEvent * nFeatures);
     }
