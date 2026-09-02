@@ -4,8 +4,8 @@ project(FastBDT)
 
 include(CTest)
 
-set(FastBDT_VERSION_MAJOR 5)
-set(FastBDT_VERSION_MINOR 6)
+set(FastBDT_VERSION_MAJOR 6)
+set(FastBDT_VERSION_MINOR 0)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
