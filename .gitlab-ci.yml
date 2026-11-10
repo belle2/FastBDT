@@ -13,7 +13,6 @@ workflow:
   - "gcc:16"
   - "gcc:15"
   - "gcc:13"
-  - "gcc:11"
   # Clang
   - "silkeh/clang:21"
   - "silkeh/clang:20"
