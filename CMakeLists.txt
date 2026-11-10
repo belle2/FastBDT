@@ -122,7 +122,11 @@ if(PYTHON)
     execute_process(
       COMMAND ${PYTHON} -m pip install .
       WORKING_DIRECTORY \"${PROJECT_BINARY_DIR}\"
+      RESULT_VARIABLE _fastbdt_pip_result
     )
+    if(NOT _fastbdt_pip_result EQUAL 0)
+      message(FATAL_ERROR \"FastBDT: installing the Python bindings with '${PYTHON} -m pip install .' failed.\")
+    endif()
   ")
 else()
   message(STATUS "FastBDT: could not find python3 executable, skip installation of Python bindings.")
