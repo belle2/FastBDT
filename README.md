@@ -55,17 +55,29 @@ pixi global install fastbdt-double-weight
 
 #### From source
 
-To build and install FastBDT from source, use the following commands:
+Requirements: CMake ≥ 3.13 and a C++14 compiler. For the Python bindings: `python3` with `pip` and `numpy`. For the unit tests (optional): GoogleTest.
+
+FastBDT is not available on PyPI: use `conda-forge` (see above) or build from source.
+
+Activate the Python environment you want the bindings installed into (conda, pixi, venv, ...) **before** configuring, then run:
 
 ```bash
-mkdir -p build install && cd build
-cmake ..
-make
-make install
+mkdir -p build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=../install
+cmake --build . -j
+cmake --build . --target install
 ```
 
-This will also install the Python bindings automatically if CMake detects a valid `python3` interpreter during the configuration step.
-To build the double-precision variant from source, see [Weight type and numerical precision](#weight-type-and-numerical-precision).
+This installs the C++ and C libraries and headers into `install/`, and the Python bindings into the active Python environment (via `pip`).
+The bindings are only built if CMake finds a `python3` interpreter during the configuration step.
+
+Useful options:
+
+- `-DPYTHON=/path/to/python3`: choose the Python interpreter explicitly.
+- `-DUSE_DOUBLE_WEIGHT=ON`: build the double-precision variant (see [Weight type and numerical precision](#weight-type-and-numerical-precision)).
+- `-DBUILD_TESTING=OFF`: skip building the unit tests.
+
+To use the installed libraries from C++, compile with `-I<prefix>/include -L<prefix>/lib -lFastBDT_shared` and make sure `<prefix>/lib` is on `LD_LIBRARY_PATH` (`DYLD_LIBRARY_PATH` on macOS) at runtime.
 
 ---
 
